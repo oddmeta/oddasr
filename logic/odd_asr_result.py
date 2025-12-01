@@ -14,7 +14,7 @@ from funasr import AutoModel
 import threading
 
 from log import logger
-import proto
+import logic.proto as proto
 
 # 创建一个线程安全的优先级队列
 asr_result_queue = queue.SimpleQueue()

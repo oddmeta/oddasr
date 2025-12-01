@@ -10,7 +10,7 @@
 import werkzeug.utils
 import os
 from datetime import timedelta
-import odd_asr_exceptions
+from logic import odd_asr_exceptions 
 import odd_asr_config as config
 from flask import Flask, request, jsonify, make_response
 

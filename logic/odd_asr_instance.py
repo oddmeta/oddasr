@@ -9,8 +9,8 @@
 
 from log import logger
 
-from odd_asr_file import OddAsrFile, OddAsrParamsFile
-from odd_asr_sentence import OddAsrSentence, OddAsrParamsSentence
+from logic.odd_asr_file import OddAsrFile, OddAsrParamsFile
+from logic.odd_asr_sentence import OddAsrSentence, OddAsrParamsSentence
 import odd_asr_config as config
 
 # File ASR

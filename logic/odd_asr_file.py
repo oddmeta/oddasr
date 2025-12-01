@@ -3,8 +3,8 @@
 @author: catherine wei
 @contact: EMAIL@contact: catherine@oddmeta.com
 @software: PyCharm 
-@file: odd_asr_sentence.py 
-@info: 语音识别类，用于语音识别句子
+@file: odd_asr_file.py 
+@info: 语音识别类，用于语音识别文件
 """
 
 import torch
@@ -13,12 +13,12 @@ import torchaudio
 
 import os
 from funasr import AutoModel
-from utils_speech import convert_pcm_to_float, convert_time_to_millis, text_to_srt
+from logic.utils_speech import convert_pcm_to_float, convert_time_to_millis, text_to_srt
 from log import logger
 import odd_asr_config as config
 import threading
 
-class OddAsrParamsSentence(object):
+class OddAsrParamsFile:
     def __init__(self, mode="file", hotwords="", return_raw_text=True, is_final=True, sentence_timestamp=False):
         self._mode = mode  # mode should be a string like 'file','stream', 'pipeline'
         self._hotwords = hotwords  # hotwords should be a string like 'word1 word2'
@@ -27,20 +27,20 @@ class OddAsrParamsSentence(object):
         self._sentence_timestamp=sentence_timestamp  #sentence_timestamp=False, if True, return sentence timestamp, like: {text: "hello world", timestamp: [[0, 1000], [1000, 2000]], is_final: False, sentence_timestamp: [[0, 2000]]},
         self._is_busy=False
 
-class OddAsrSentence:
+class OddAsrFile:
     """
     语音识别类，用于语音识别文件
     """
-    _sentenceParam: OddAsrParamsSentence = None
+    _fileParam: OddAsrParamsFile = None
     _model: AutoModel = None
     _device = None
 
-    def __init__(self, sentenceParam:OddAsrParamsSentence=None):
+    def __init__(self, fileParam:OddAsrParamsFile=None):
 
-        if sentenceParam is None:
-            self._sentenceParam = OddAsrParamsSentence()
+        if fileParam is None:
+            self._fileParam = OddAsrParamsFile()
         else:
-            self._sentenceParam = sentenceParam
+            self._fileParam = fileParam
 
         if config.odd_asr_cfg["enable_gpu"]:
             # auto detect GPU _device
@@ -55,16 +55,16 @@ class OddAsrSentence:
 
         # load model on init due to the model is large, and the model is not loaded on the first call
         if config.odd_asr_cfg["preload_model"]:
-            self.load_sentence_model(self._device)
+            self.load_file_model(self._device)
 
         self.lock = threading.Lock()  # mutex lock for _is_busy
 
-    def load_sentence_model(self, device="cuda:0"):
+    def load_file_model(self, device="cuda:0"):
         # load file model
         if self._model is not None:
             return
 
-        logger.info(f"Loading sentence model with device={device}")
+        logger.info(f"Loading model with device={device}")
 
         self._model = AutoModel(
             # model="iic/speech_paraformer_asr_nat-zh-cn-16k-aishell2-vocab5212-pytorch",
@@ -82,7 +82,7 @@ class OddAsrSentence:
         )
         logger.info("Model loaded successfully.")
 
-    def transcribe_sentence(self, audio_file, hotwords="", output_format="txt"):
+    def transcribe_file(self, audio_file, hotwords="", output_format="txt"):
         self.set_busy(True)
         try:
             # check audio file exists
@@ -148,51 +148,51 @@ class OddAsrSentence:
                     hotword=hotwords  # Pass the hotwords as a string to the _model
                 )
             except Exception as e:
-                logger.error(f"ASR sentence generate error: {e}")
+                logger.error(f"ASR generate error: {e}")
                 self.set_busy(False)
-                raise RuntimeError(f"ASR sentence generate error: {str(e)}")
+                raise RuntimeError(f"ASR generate error: {e}")
     
-            output_text = ""
-            logger.debug(f"ASR result: {result}")
+            output_text = []
+
+            logger.info(f"ASR result: {result}")
     
             try:
-                match output_format:
-                    case "raw":
-                        output_text = result
-                    case "srt":
-                        # Check if sentence_info exists in result
-                        if isinstance(result, list) and len(result) > 0 and "sentence_info" in result[0]:
-                            sentences = result[0]["sentence_info"]
-                            subtitles = []
-    
-                            logger.debug(f"sentence_info: {sentences[:2]}...")
-    
-                            for idx, sentence in enumerate(sentences):
-                                sub = text_to_srt(idx=idx, speaker_id=sentence['spk'], 
-                                               msg=sentence['text'], start_microseconds=sentence['start'], 
-                                               end_microseconds=sentence['end'])
-                                subtitles.append(sub)
-    
-                            output_text = "\n".join(subtitles)
-                        else:
-                            output_text = result[0]["text"] if isinstance(result, list) and len(result) > 0 and "text" in result[0] else ""
-                    case "spk":
-                        # Check if sentence_info exists in result
-                        if isinstance(result, list) and len(result) > 0 and "sentence_info" in result[0]:
-                            sentences = result[0]["sentence_info"]
-                            subtitles = []
-    
-                            for idx, sentence in enumerate(sentences):
-                                sub = f"发言人 {sentence['spk']}: {sentence['text']}"
-                                subtitles.append(sub)
-    
-                            output_text = "\n".join(subtitles)
-                        else:
-                            output_text = result[0]["text"] if isinstance(result, list) and len(result) > 0 and "text" in result[0] else ""
-                    case "txt":
+                if output_format == "raw":
+                    output_text = result
+                elif output_format == "srt":
+                    # Check if sentence_info exists in result
+                    if isinstance(result, list) and len(result) > 0 and "sentence_info" in result[0]:
+                        sentences = result[0]["sentence_info"]
+                        subtitles = []
+
+                        logger.debug(f"sentence_info: {sentences[:2]}...")
+
+                        for idx, sentence in enumerate(sentences):
+                            sub = text_to_srt(idx=idx, speaker_id=sentence['spk'], 
+                                            msg=sentence['text'], start_microseconds=sentence['start'], 
+                                            end_microseconds=sentence['end'])
+                            subtitles.append(sub)
+
+                        output_text = "\n".join(subtitles)
+                    else:
                         output_text = result[0]["text"] if isinstance(result, list) and len(result) > 0 and "text" in result[0] else ""
-                    case _:
+                elif output_format == "spk":
+                    # Check if sentence_info exists in result
+                    if isinstance(result, list) and len(result) > 0 and "sentence_info" in result[0]:
+                        sentences = result[0]["sentence_info"]
+                        subtitles = []
+    
+                        for idx, sentence in enumerate(sentences):
+                            sub = f"发言人 {sentence['spk']}: {sentence['text']}"
+                            subtitles.append(sub)
+
+                        output_text = "\n".join(subtitles)
+                    else:
                         output_text = result[0]["text"] if isinstance(result, list) and len(result) > 0 and "text" in result[0] else ""
+                elif output_format == "txt":
+                    output_text = result[0]["text"] if isinstance(result, list) and len(result) > 0 and "text" in result[0] else ""
+                else:
+                    output_text = result[0]["text"] if isinstance(result, list) and len(result) > 0 and "text" in result[0] else ""
             except Exception as e:
                 logger.error(f"Failed to process output format: {e}")
                 self.set_busy(False)
@@ -203,15 +203,15 @@ class OddAsrSentence:
     
         except Exception as e:
             self.set_busy(False)
-            logger.error(f"ASR sentence generate error: {e}")
-            raise RuntimeError(f"ASR sentence generate error: {e}")
+            logger.error(f"Exception in transcribe_file: {e}")
+            raise RuntimeError(f"Exception in transcribe_file: {e}")
 
     def set_busy(self, is_busy):
         with self.lock:  # 使用锁保护共享资源
-            self._sentenceParam._is_busy = is_busy
+            self._fileParam._is_busy = is_busy
             if not is_busy:
                 logger.info(f"set_busy to False, done")
 
     def is_busy(self):
         with self.lock:  # 使用锁保护共享资源
-            return self._sentenceParam._is_busy
+            return self._fileParam._is_busy

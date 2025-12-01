@@ -13,10 +13,10 @@ import asyncio
 from time import sleep
 
 from odd_asr_app import app
-from odd_asr_instance import init_instance_file, init_instance_sentence
+from logic.odd_asr_instance import init_instance_file, init_instance_sentence
 
-from odd_wss_server import init_instances_stream, start_wss_server
-from scheduled_task import ScheduledTask
+from logic.odd_wss_server import init_instances_stream, start_wss_server
+from logic.scheduled_task import ScheduledTask
 
 from log import logger
 import odd_asr_config as config

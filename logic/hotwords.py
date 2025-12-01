@@ -1,14 +1,13 @@
 """热词相关处理逻辑"""
 from sqlalchemy import and_
-
-from log import logger
 import json
 
-import odd_asr_exceptions as exceptions
-from model import hotword
-from model import db
-from logic.users import check_user,g_data
+from log import logger
 
+from model import db
+from model import hotword
+from logic.users import check_user,g_data
+import logic.odd_asr_exceptions as exceptions
 
 class HotWordManage(object):
 

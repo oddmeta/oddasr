@@ -29,7 +29,7 @@ import enum
 from websockets.asyncio.client import connect
 from log import logger
 import odd_asr_config as config
-import proto
+import logic.proto as proto
 
 class odd_asr_state(enum.Enum):
     EM_ASR_STATE_IDLE = 0,

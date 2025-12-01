@@ -2,16 +2,16 @@ import threading
 import time
 import json
 import uuid
-
 from sqlalchemy import false
+
 from log import logger
+
 from logic.minutes import *
 from logic import sensitivewords
-from odd_asr_file import OddAsrFile
-from odd_asr_instance import find_free_odd_asr_file, init_instance_file
+from logic.odd_asr_file import OddAsrFile
+from logic.odd_asr_instance import find_free_odd_asr_file, init_instance_file
 
 from model.meeting import CMeetingStatus2 # MEETING_OPEN_STATUS_INIT, MEETING_OPEN_STATUS_ENCODE, MEETING_OPEN_STATUS_EXCEPTION
-
 
 class ScheduledTask(threading.Thread):
     def __init__(self, status_notifier):

@@ -18,12 +18,13 @@ import ssl
 import uuid
 import queue
 
-from odd_asr_stream import OddAsrStream, OddAsrParamsStream
-from odd_asr_result import notifyTask
 import odd_asr_config as config
 from log import logger
-from odd_asr_exceptions import *
-from proto import TOddAsrTranscribeRes, obj_to_dict, TOddAsrApplyRes, obj_from_dict_recursive, obj_to_dict_recursive
+
+from logic.odd_asr_stream import OddAsrStream, OddAsrParamsStream
+from logic.odd_asr_result import notifyTask
+from logic.odd_asr_exceptions import *
+from logic.proto import TOddAsrTranscribeRes, obj_to_dict, TOddAsrApplyRes, obj_from_dict_recursive, obj_to_dict_recursive
 
 '''
 client --> server: TCmdApppyAsrReq

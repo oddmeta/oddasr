@@ -9,17 +9,16 @@
 
 import torch
 import numpy as np
-
 import queue
 import threading
 import time
 import re
 import copy
-
 import os
 from funasr import AutoModel
 from log import logger
-from odd_asr_result import enque_asr_result, OddAsrStreamResult
+
+from logic.odd_asr_result import enque_asr_result, OddAsrStreamResult
 import odd_asr_config as config
 
 class AudioFrame:

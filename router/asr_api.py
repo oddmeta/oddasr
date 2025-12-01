@@ -16,10 +16,10 @@ from mutagen.mp3 import MP3
 
 # import app
 from log import logger
-from odd_asr_instance import find_free_odd_asr_file, find_free_odd_asr_sentence
-from scheduled_task import ScheduledTask
-from odd_asr_file import OddAsrFile
-from odd_asr_sentence import OddAsrSentence
+from logic.odd_asr_instance import find_free_odd_asr_file, find_free_odd_asr_sentence
+from logic.scheduled_task import ScheduledTask
+from logic.odd_asr_file import OddAsrFile
+from logic.odd_asr_sentence import OddAsrSentence
 
 ########################################
 ## main
@@ -70,12 +70,11 @@ def transcribe_sentence():
 
         # recognition with hotwords
         try:
-            match mode:
-                case "file":
-                    result = odd_asr_sentence.transcribe_sentence(audio_file=temp_path, hotwords=hotwords, output_format=output_format)
-                case _:
-                    return_ok = False
-                    result = f"unsupported mode: {mode}."
+            if mode == "file":
+                result = odd_asr_sentence.transcribe_sentence(audio_file=temp_path, hotwords=hotwords, output_format=output_format)
+            else:
+                return_ok = False
+                result = f"unsupported mode: {mode}."
         except Exception as e:
             logger.error(f"ASR processing error: {e}")
             result = f"ASR processing error: {str(e)}"
