@@ -1,4 +1,4 @@
-**Read this in other languages: [中文](README.md), [English](README.en.md).**
+**Read this in other languages: [English](README.md), [中文](README.chs.md).**
 
 # OddASR: 基于FunASR的简单ASR API服务器
 
@@ -128,6 +128,14 @@ set HF_HOME=F:/ai_share/models
 ```bash
 export HF_ENDPOINT=https://hf-mirror.com
 export HF_HOME=/data/ai_share/models
+```
+
+#### 3) 临时文件权限问题
+
+后台在做转写的时候需要一些临时的存储，默认会将临时文件保存到 `/tmp` 目录下，因此在你运行 `oddasr` 前务必确认你具备 `/tmp` 目录的读写权限，<font color=red>**否则会出现类似下面的错误**</font>：
+
+```python
+(index):742 XHR状态: 500 响应文本: {"error":"ASR processing error: ASR sentence generate error: Failed to load audio file: local variable 'parent' referenced before assignment"}
 ```
 
 ## 四、如何使用OddASR?

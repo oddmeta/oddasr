@@ -13,6 +13,7 @@ import wave
 
 from flask import Blueprint, request, jsonify
 from mutagen.mp3 import MP3
+import tempfile
 
 # import app
 from oddasr.log import logger
@@ -32,8 +33,9 @@ def transcribe_sentence():
     Receive an audio file from the client and return the transcribed text.
     """
     return_ok = True
+    temp_file = None
+    temp_path = None
     try:
-
         # Get the uploaded audio file
         audio_file = request.files.get('audio')
         if not audio_file:
@@ -44,12 +46,13 @@ def transcribe_sentence():
         output_format = request.form.get('output_format', "txt")  # output_format should be a string like 'txt', 'srt', 'spk'
         hotwords = request.form.get('hotwords', "")  # hotwords should be a string like 'word1 word2'
 
-        # Create a temporary directory with proper permissions
-        import tempfile
-        temp_dir = tempfile.gettempdir()
-        temp_path = os.path.join(temp_dir, f"temp_audio_{os.urandom(8).hex()}.wav")
+        # Create a temporary file with proper permissions
+        # tempfile.NamedTemporaryFile will create a file in a location the user has permission to write to
+        temp_file = tempfile.NamedTemporaryFile(suffix='.wav', delete=False)
+        temp_path = temp_file.name
+        temp_file.close()  # Close the file so we can save the uploaded audio to it
 
-        # Save the audio file to a temporary location
+        # Save the audio file to the temporary location
         try:
             audio_file.save(temp_path)
             logger.info(f"Received audio and saved to: {temp_path}")
@@ -62,7 +65,7 @@ def transcribe_sentence():
         
         if not odd_asr_sentence:
             # Clean up the temporary file
-            if os.path.exists(temp_path):
+            if temp_path and os.path.exists(temp_path):
                 os.remove(temp_path)
             return_ok = False
             result = "no available asr instance."
@@ -81,7 +84,7 @@ def transcribe_sentence():
             return_ok = False
         finally:
             # Delete the temporary file
-            if os.path.exists(temp_path):
+            if temp_path and os.path.exists(temp_path):
                 try:
                     os.remove(temp_path)
                     logger.info(f"Deleted temporary file: {temp_path}")
@@ -100,6 +103,13 @@ def transcribe_sentence():
         logger.error(f"Unexpected error in transcribe endpoint: {e}")
         import traceback
         logger.error(traceback.format_exc())
+        # Clean up the temporary file in case of unexpected errors
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+                logger.info(f"Deleted temporary file: {temp_path}")
+            except Exception as e:
+                logger.warning(f"Failed to delete temporary file: {e}")
         return jsonify({"error": str(e)}), 500
 
 @bp.route('/v1/asr/file', methods=['POST'])
@@ -108,8 +118,9 @@ def transcribe():
     Receive an audio file from the client and return the transcribed text.
     """
     return_ok = True
+    temp_file = None
+    temp_path = None
     try:
-
         # Get the uploaded audio file
         audio_file = request.files.get('audio')
         if not audio_file:
@@ -120,12 +131,13 @@ def transcribe():
         output_format = request.form.get('output_format', "txt")  # output_format should be a string like 'txt', 'srt', 'spk'
         hotwords = request.form.get('hotwords', "")  # hotwords should be a string like 'word1 word2'
 
-        # Create a temporary directory with proper permissions
-        import tempfile
-        temp_dir = tempfile.gettempdir()
-        temp_path = os.path.join(temp_dir, f"temp_audio_{os.urandom(8).hex()}.wav")
+        # Create a temporary file with proper permissions
+        # tempfile.NamedTemporaryFile will create a file in a location the user has permission to write to
+        temp_file = tempfile.NamedTemporaryFile(suffix='.wav', delete=False)
+        temp_path = temp_file.name
+        temp_file.close()  # Close the file so we can save the uploaded audio to it
 
-        # Save the audio file to a temporary location
+        # Save the audio file to the temporary location
         try:
             audio_file.save(temp_path)
             logger.info(f"Received audio and saved to: {temp_path}")
@@ -133,12 +145,38 @@ def transcribe():
             logger.error(f"Failed to save audio file: {e}")
             return jsonify({"error": f"Failed to save audio file: {str(e)}"}), 500
 
+        # find a odd_asr_file instance
+        odd_asr_file: OddAsrFile = find_free_odd_asr_file()
+        
+        if not odd_asr_file:
+            # Clean up the temporary file
+            if temp_path and os.path.exists(temp_path):
+                os.remove(temp_path)
+            return_ok = False
+            result = "no available asr instance."
+            return jsonify({"error": result}), 500
 
-        logger.info(f"mode:{mode}, fmt={output_format}...")
+        # recognition with hotwords
+        try:
+            if mode == "file":
+                result = odd_asr_file.transcribe(audio_file=temp_path, hotwords=hotwords, output_format=output_format)
+            else:
+                return_ok = False
+                result = f"unsupported mode: {mode}."
+        except Exception as e:
+            logger.error(f"ASR processing error: {e}")
+            result = f"ASR processing error: {str(e)}"
+            return_ok = False
+        finally:
+            # Delete the temporary file
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                    logger.info(f"Deleted temporary file: {temp_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to delete temporary file: {e}")
 
-        result = {
-
-        }
+        logger.info(f"Recognized mode:{mode}, fmt={output_format}, result: {result[:100]}...")
 
         # Return the recognition result
         if not return_ok:
@@ -150,6 +188,13 @@ def transcribe():
         logger.error(f"Unexpected error in transcribe endpoint: {e}")
         import traceback
         logger.error(traceback.format_exc())
+        # Clean up the temporary file in case of unexpected errors
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+                logger.info(f"Deleted temporary file: {temp_path}")
+            except Exception as e:
+                logger.warning(f"Failed to delete temporary file: {e}")
         return jsonify({"error": str(e)}), 500
 
 @bp.route('/v1/asr/file/upload', methods=['POST'])
