@@ -2,7 +2,7 @@ import requests
 
 def test_file(audio_path: str, output_format: str = "txt"):
     # 设置服务的 URL
-    url = "http://127.0.0.1:12340/v1/asr"
+    url = "http://127.0.0.1:9002/v1/asr"
     # 定义 hotwords
     hotwords = "小落 小落同学 奥德元 小奥"
     # 打开音频文件

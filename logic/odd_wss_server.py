@@ -18,13 +18,13 @@ import ssl
 import uuid
 import queue
 
-import odd_asr_config as config
-from log import logger
+import oddasr.odd_asr_config as config
+from oddasr.log import logger
 
-from logic.odd_asr_stream import OddAsrStream, OddAsrParamsStream
-from logic.odd_asr_result import notifyTask
-from logic.odd_asr_exceptions import *
-from logic.proto import TOddAsrTranscribeRes, obj_to_dict, TOddAsrApplyRes, obj_from_dict_recursive, obj_to_dict_recursive
+from oddasr.logic.odd_asr_stream import OddAsrStream, OddAsrParamsStream
+from oddasr.logic.odd_asr_result import notifyTask
+from oddasr.logic.odd_asr_exceptions import *
+from oddasr.logic.proto import TOddAsrTranscribeRes, obj_to_dict, TOddAsrApplyRes, obj_from_dict_recursive, obj_to_dict_recursive
 
 '''
 client --> server: TCmdApppyAsrReq
@@ -380,7 +380,7 @@ async def notify_task(_wss_server=None):
             continue
 
 
-def init_instances_stream(server: OddWssServer):
+def init_instances_stream(server: OddWssServer = None):
     '''
     初始化odd_asr_stream实例。
     由于初始化加载模型比较耗时，所以在启动的时候就预加载。
@@ -419,9 +419,31 @@ def init_notify_task(server: OddWssServer):
     notify_Task.start(server)
 
 
+# 修改 oddasr/logic/odd_wss_server.py 文件中的 start_wss_server 函数
 async def start_wss_server():
     global _wss_server
     _wss_server = OddWssServer()
+    
+    ssl_context = None
+    if config.odd_asr_cfg["enable_https"]:
+        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ssl_context.load_cert_chain(
+            config.odd_asr_cfg["ssl_cert_path"],
+            config.odd_asr_cfg["ssl_key_path"]
+        )
+    
+    # 创建服务器
+    server = await serve(_wss_server.handle_client, config.WS_HOST, config.WS_PORT, ssl=ssl_context)
+    
+    try:
+        # 等待取消
+        await asyncio.Future()
+    except asyncio.CancelledError:
+        # 关闭服务器
+        server.close()
+        await server.wait_closed()
+        logger.info("WebSocket server closed")
+        raise
 
     init_notify_task(_wss_server)
     init_instances_stream(_wss_server)

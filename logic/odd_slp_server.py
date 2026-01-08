@@ -12,17 +12,16 @@
 import asyncio
 from websockets.asyncio.server import serve
 import json
-import numpy as np
 import websockets
 import uuid
 import queue
 
-import odd_asr_config as config
-from log import logger
+import oddasr.odd_asr_config as config
+from oddasr.log import logger
 
-from logic.odd_asr_exceptions import mai_err_name, EM_ERR_ASR_ARGS_ERROR
-from logic.odd_asr_exceptions import *
-from logic.proto import TOddAsrTranscribeRes, obj_to_dict, TOddAsrApplyRes, obj_from_dict_recursive, obj_to_dict_recursive
+from oddasr.logic.odd_asr_exceptions import mai_err_name, EM_ERR_ASR_ARGS_ERROR
+from oddasr.logic.odd_asr_exceptions import *
+from oddasr.logic.proto import TOddAsrTranscribeRes, obj_to_dict, TOddAsrApplyRes, obj_from_dict_recursive, obj_to_dict_recursive
 
 '''
 client --> server: TCmdApppyAsrReq

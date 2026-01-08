@@ -1,0 +1,73 @@
+{
+  "HOST": "0.0.0.0",
+  "PORT": 9002,
+  "WS_HOST": "0.0.0.0",
+  "WS_PORT": 8101,
+  "Debug": false,
+  "odd_asr_cfg": {
+    "preload_model": true,
+    "enable_gpu": false,
+    "disable_stream": false,
+    "concurrent_thread": 0,
+    "asr_stream_cfg": {
+      "max_instance": 1,
+      "save_audio": false,
+      "punct_mini_len": 10,
+      "punct_time_mini_force_trigger": 3,
+      "free_resource_timeout": 5,
+      "force_final_result": 20,
+      "vad_threshold": 0.8,
+      "vad_min_speech_duration": 300,
+      "vad_min_silence_duration": 200
+    },
+    "asr_file_cfg": {
+      "max_instance": 1,
+      "save_audio": false
+    },
+    "asr_sentence_cfg": {
+      "max_instance": 1,
+      "save_audio": false,
+      "punct_mini_len": 10,
+      "punct_time_mini_force_trigger": 3,
+      "free_resource_timeout": 5,
+      "force_final_result": 20,
+      "vad_threshold": 0.8,
+      "vad_min_speech_duration": 300,
+      "vad_min_silence_duration": 200
+    },
+    "enable_https": false,
+    "ssl_cert_path": "scripts/cert.pem",
+    "ssl_key_path": "scripts/key.pem"
+  },
+  "odd_asr_slp_cfg": {
+    "sensitive_words": {
+      "path": "scripts/sensitivewords"
+    },
+    "hotwords": {
+      "path": "scripts/hotwords"
+    }
+  },
+  "db_cfg": {
+    "db_engine": "sqlite",
+    "db_name": "oddasr.db",
+    "db_user": "",
+    "db_password": "",
+    "db_host": "",
+    "db_port": ""
+  },
+  "redis_cfg": {
+    "redis_enabled": false,
+    "redis_host": "127.0.0.1",
+    "redis_port": 7379,
+    "redis_password": ""
+  },
+  "log_file": "oddasr.log",
+  "log_path": "logs/",
+  "log_level": 10,
+  "asr": {
+    "liveasr": "",
+    "appid": "oddasrtest",
+    "secret": "oddasrtest"
+  },
+  "Users": "oddasr_users.json"
+}

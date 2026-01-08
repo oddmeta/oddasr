@@ -16,10 +16,10 @@ import re
 import copy
 import os
 from funasr import AutoModel
-from log import logger
 
-from logic.odd_asr_result import enque_asr_result, OddAsrStreamResult
-import odd_asr_config as config
+from oddasr.log import logger
+from oddasr.logic.odd_asr_result import enque_asr_result, OddAsrStreamResult
+import oddasr.odd_asr_config as config
 
 class AudioFrame:
     def __init__(self, data, sr: int = 16000, channel=1, bit_depth=16, timestamp = 0):

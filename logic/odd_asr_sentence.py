@@ -10,13 +10,14 @@
 import torch
 import librosa
 import torchaudio
+import threading
 
 import os
 from funasr import AutoModel
-from logic.utils_speech import convert_pcm_to_float, convert_time_to_millis, text_to_srt
-from log import logger
-import odd_asr_config as config
-import threading
+
+from oddasr.logic.utils_speech import convert_pcm_to_float, convert_time_to_millis, text_to_srt
+from oddasr.log import logger
+import oddasr.odd_asr_config as config
 
 class OddAsrParamsSentence(object):
     def __init__(self, mode="file", hotwords="", return_raw_text=True, is_final=True, sentence_timestamp=False):

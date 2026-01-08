@@ -1,6 +1,5 @@
-from email.policy import default
 from sqlalchemy import Column, Integer, String
-from model.db import Base
+from oddasr.model.db import Base
 from enum import Enum
 
 class CMeetingStatus(str, Enum):

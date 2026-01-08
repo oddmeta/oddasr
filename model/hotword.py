@@ -1,7 +1,8 @@
 from pydoc import text
 from sqlalchemy import Column, Integer, String,Text
 # from sqlalchemy.dialects.mysql import MEDIUMTEXT, LONGTEXT
-from model import db
+
+from oddasr.model import db
 
 
 class CHotWords(db.Base):

@@ -9,7 +9,8 @@
 
 from sqlalchemy import Column, Integer, String, Text
 from sqlalchemy.dialects.mysql import MEDIUMTEXT, LONGTEXT
-from model import db
+
+from oddasr.model import db
 
 
 class CSensitiveWord(db.Base):

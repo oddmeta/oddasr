@@ -1,5 +1,5 @@
 import os
-from odd_asr_file import OddAsrFile
+from oddasr.logic.odd_asr_file import OddAsrFile
 from pynput import keyboard
 
 asr = OddAsrFile()

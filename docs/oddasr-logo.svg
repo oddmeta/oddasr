@@ -1,0 +1,22 @@
+<svg width="400" height="120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Main Logo Text -->
+  <text x="200" y="60" font-family="Product Sans, Roboto, Arial, sans-serif"
+        font-size="48" font-weight="500" letter-spacing="1" text-anchor="middle">
+    <tspan fill="#4285F4">O</tspan>
+    <tspan fill="#EA4335">d</tspan>
+    <tspan fill="#FBBC05">d</tspan>
+    <tspan fill="#34A853">A</tspan>
+    <tspan fill="#4285F4">S</tspan>
+    <tspan fill="#EA4335">R</tspan>
+  </text>
+  <text x="200" y="90" font-family="Roboto, Arial, sans-serif"
+        fill="#5F6368" text-anchor="middle">
+    <tspan font-size="16">A Simple ASR API Server for FunASR</tspan>
+  </text>
+  <!-- Tagline -->
+  <text x="200" y="90" font-family="Roboto, Arial, sans-serif"
+        fill="#5F6368" text-anchor="middle">
+    <tspan font-size="16">A Simple ASR API Server for FunASR</tspan>
+    <tspan x="200" dy="1.2em" font-size="12">https://github.com/oddmeta/oddasr</tspan>
+  </text>
+</svg>

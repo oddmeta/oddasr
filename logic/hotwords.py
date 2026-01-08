@@ -2,12 +2,12 @@
 from sqlalchemy import and_
 import json
 
-from log import logger
+from oddasr.log import logger
 
-from model import db
-from model import hotword
-from logic.users import check_user,g_data
-import logic.odd_asr_exceptions as exceptions
+from oddasr.model import db
+from oddasr.model import hotword
+from oddasr.logic.users import check_user,g_data
+import oddasr.logic.odd_asr_exceptions as exceptions
 
 class HotWordManage(object):
 

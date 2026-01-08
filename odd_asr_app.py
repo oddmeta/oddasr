@@ -10,11 +10,12 @@
 import werkzeug.utils
 import os
 from datetime import timedelta
-from logic import odd_asr_exceptions 
-import odd_asr_config as config
 from flask import Flask, request, jsonify, make_response
 
-from log import logger
+from oddasr.logic import odd_asr_exceptions 
+import oddasr.odd_asr_config as config
+
+# from oddasr.log import logger
 
 # register blueprints
 def register_blueprints(new_app, path):
@@ -25,7 +26,7 @@ def register_blueprints(new_app, path):
     return new_app
 
 app = Flask(__name__, static_url_path='')
-register_blueprints(app, 'router')
+register_blueprints(app, 'oddasr.router')
 app.config['SECRET_KEY'] = os.urandom(24)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 
@@ -38,4 +39,4 @@ def add_cache_control(response):
     response.headers['Expires'] = '-1'
     return response
 
-import router.asr_api
+import oddasr.router.asr_api

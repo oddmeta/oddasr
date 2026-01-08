@@ -15,11 +15,11 @@ from flask import Blueprint, request, jsonify
 from mutagen.mp3 import MP3
 
 # import app
-from log import logger
-from logic.odd_asr_instance import find_free_odd_asr_file, find_free_odd_asr_sentence
-from logic.scheduled_task import ScheduledTask
-from logic.odd_asr_file import OddAsrFile
-from logic.odd_asr_sentence import OddAsrSentence
+from oddasr.log import logger
+from oddasr.logic.odd_asr_instance import find_free_odd_asr_file, find_free_odd_asr_sentence
+from oddasr.logic.scheduled_task import ScheduledTask
+from oddasr.logic.odd_asr_file import OddAsrFile
+from oddasr.logic.odd_asr_sentence import OddAsrSentence
 
 ########################################
 ## main
