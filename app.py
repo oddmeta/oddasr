@@ -40,6 +40,22 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 def main():
+    print("===================================================================")
+    asciiart = r"""
+ OOO   dddd   dddd   M   M  eeeee  ttttt   aaaaa
+O   O  d   d  d   d  MM MM  e        t    a     a
+O   O  d   d  d   d  M M M  eeee     t    aaaaaaa
+O   O  d   d  d   d  M   M  e        t    a     a
+ OOO   dddd   dddd   M   M  eeeee    t    a     a
+
+ ⭐️ Open Source: https://github.com/oddmeta/oddasr
+ 📖 Documentation: https://docs.oddmeta.net/
+        """
+
+    print(asciiart)
+    print("===================================================================")
+
+
     # 注册信号处理
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
