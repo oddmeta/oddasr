@@ -9,8 +9,9 @@
 一个基于Flask的最简单的FunASR ASR API服务器，支持音频文件模式和流式模式转录。
 
 <font color=red>本文档是OddASR的使用文档, 如果你是一个开发者, 想自行对 OddASR 做一些修改, 请参考开发文档。</font>
+
 - [中文开发文档](docs/README.chs.md)
-- [English Developer Readme](docs/README.md)
+- [English Developer Guide](docs/README.md)
 
 ## 一、前言
 

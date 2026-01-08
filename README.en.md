@@ -1,77 +1,211 @@
 **Read this in other languages: [English](README.en.md), [中文](README.md).**
 
-[TOC]
-
-Here’s a draft for the `README.md` file based on your project:
-
----
-
 # OddASR: A Simple ASR API Server for FunASR
 
 ![GitHub](https://img.shields.io/github/license/oddmeta/oddasr)
 
 A simplest ASR API server for FunASR based on Flask, supporting both audio file mode and streaming mode transcriptions.
 
-## Introduction
+<font color=red>This document is the user guide for OddASR. If you are a developer and want to modify OddASR yourself, please refer to the developer documentation.</font>
+- [Chinese Developer Guide](docs/README.chs.md)
+- [English Developer Guide](docs/README.md)
 
-**[FunASR](https://github.com/modelscope/FunASR)** is a powerful open-source speech recognition (ASR) library developed by ModelScope.
-It provides a wide range of pre-trained models and tools for various speech recognition tasks.
-This repository aims to simplify the deployment of FunASR for non-realtime audio processing which is my another project ([小落同学](https://x.oddmeta.com)) needed.
+## I. Preface
 
-## Why OddASR?
+### 1. About OddASR
+
+Since my project **[XiaoLuo TongXue](https://x.oddmeta.net)** needs ASR functionality, I encapsulated **[FunASR](https://github.com/modelscope/FunASR)** to enable voice conversation support for XiaoLuo TongXue.
+
+Additionally, **[OddAgent](https://github.com/oddmeta/oddagent)** also uses OddASR to allow users to directly input voice on the web. If you're interested, you can also refer to the code in OddAgent.
+
+Considering the wide use of ASR functionality, some friends have privately asked me about related usage and encapsulation issues, especially regarding streaming ASR support (there are many FunASR API encapsulations on GitHub, but all are offline file transcription, none support both offline file transcription and streaming transcription). I thought I might as well open-source it directly. I hope it helps students who need ASR functionality.
+
+I've also done some evaluations on FunASR, FireRedAsr, Vosk, and other ASR projects, but overall, in my own usage scenarios, FunASR performs the best (no intention to belittle other ASRs, just limited to my own usage experience).
+
+### 2. Why Should You Choose OddASR?
 
 - **Simplified Deployment**: Easy-to-use REST API for ASR transcription.
-- **Local Reference**: A standalone Python implementation for local ASR transcription.
-- **Docker Support**: Dockerfiles for both GPU and CPU deployment.
+- **Local Reference**: Standalone Python implementation for local ASR transcription.
+- **Docker Support**: Dockerfiles supporting both GPU and CPU deployment.
 - **Easy to Use**: Simple API requests for audio file transcription.
 
-## Installation
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/oddmeta/oddasr.git
-   cd oddasr
-   ```
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+## II. Quick Start
 
-## Usage
+### 1. Recommended Hardware
 
-### 1. Configurations for OddAsr server
+- CPU: 4 cores or more recommended.
+- Storage: OddAsr Docker image (`oddasr-cpu:v0.1.0`) is approximately 2.4GB, ASR models require about 6GB, and logs need 500M space.
+- Memory: 8GB or more recommended.
 
-You can configure the server by editting `odd_asr_config.py`, here are some important parameters:
+> My XiaoLuo TongXue uses a 99 RMB/year ECS from Alibaba Cloud with only 2 cores and 2GB RAM, which can't run the paraformer model. But I don't want to spend money on commercial APIs like XunFei/Alibaba/Baidu, so I used Vosk before.
 
-- `PORT`: The port number for the file ASR server.
-- `WS_PORT`: The port number for the stream ASR server.
-- `concurrent_thread`: The number of concurrent threads for the server.
-- `disable_stream`: Set to `True` to disable the stream ASR server.
+### 2. Install OddASR
 
-more configurations can be found in `odd_asr_config.py`
+It is recommended to install in a virtual environment to avoid conflicts with other products and projects. I personally use conda, but you can also use venv, uv, poetry, etc. Here's the installation process using conda as an example.
 
-### 2. Run the REST API Server
+Environment requirements: Python 3.10+
 
-To start the REST API server:
+- 1. Create a test virtual environment
 
 ```bash
-python main_server.py
+conda create -n oddasr python==3.10
+conda activate oddasr
 ```
 
-The OddASR server will start **both file mode and stream mode** in default configuration.
+- 2. Install OddAgent in the virtual environment
 
-If the memory usage of your running environment is critical, you can disable stream mode by editting `odd_asr_config.py` and set `disable_stream = True`
+```bash
+pip install -i https://pypi.org/simple/ oddasr
+```
 
-The file ASR server will start on `http://127.0.0.1:9002`, and the stream ASR server will start on `http://127.0.0.1:8101`.
+> Non-official mirror sites may not have the latest version, so it's recommended to use the official PyPI source.
 
-### 3. Recommended hardware
+## III. Start OddASR
 
-- CPU: 4 cores or more is recommended.
-- Storage: OddAsr docker image(oddasr-cpu:v0.1.0) size is about 2.4GB, and you need about 6GB spaces for the ASR models, and 500M spaces for the logs.
-- Memory: 8GB or more is recommended.
+### 1. Start with Default Configuration
 
-### 4. Test file ASR API
+Simply execute the following command in the installed virtual environment to start:
+
+```python
+oddasr
+```
+
+It will start with the default configuration of oddasr, enabling both **file mode and streaming mode**, and each ASR supports one concurrent session.
+
+### 2. Start with Custom Configuration
+
+If you want to modify some parameters of oddasr for custom startup, you can first download a default configuration from here:
+
+https://github.com/oddmeta/oddasr/blob/master/config.json.sample
+
+Download it and rename it to `config.json`, then make some modifications to the configuration you need (see the following introduction for the configuration items supported by OddASR), and then start OddASR in the following way:
+
+```python
+oddasr -c config.json
+```
+
+### 3. Docker Start
+
+OddASR also supports Docker startup, but I haven't packaged the image to Docker Hub. If you need Docker startup, I provide a Docker composer configuration, and you can package the image yourself.
+- `Dockerfile`: CPU version
+- `Dockerfile_GPU`: GPU version
+
+For specific packaging and Docker running methods, please refer to the development documentation:
+https://github.com/oddmeta/oddasr/blob/master/docs/README.chs.md
+
+### 4. Notes
+
+#### 1) Initial Startup Takes Time
+
+<font color=red>**When running oddasr for the first time, it will download multiple model files from the internet, which takes quite some time, from 10 minutes to more, depending on your internet bandwidth. You also need to reserve at least 8G of storage space for these model files.**</font>
+
+In addition, even if it's not the first run, the oddasr server still <font color=red>**needs a few minutes to start**</font> because by default, OddASR starts in preload mode to speed up response to ASR transcription requests.
+
+Only when you see logs like the following does it mean OddASR has been initialized successfully and started:
+
+```bash
+2025-07-25T08:22:08.093187031Z  * Running on all addresses (0.0.0.0)
+2025-07-25T08:22:08.093201526Z  * Running on http://127.0.0.1:9002
+2025-07-25T08:22:08.093213810Z  * Running on http://172.17.0.2:8101
+2025-07-25T08:22:08.093226351Z Press CTRL+C to quit
+```
+
+#### 2) Large Hard Disk Storage Requirements
+
+OddASR integrates multiple different types of models, including ASR models/VAD detection models/punctuation models/speaker separation models. These models occupy relatively large hard disk space (and need to be downloaded during the first run), so if your hard disk space is tight, you can consider specifying the storage location after model download like me:
+
+- Windows environment
+
+```bash
+set HF_ENDPOINT=https://hf-mirror.com
+set HF_HOME=F:/ai_share/models
+```
+
+- Mac/Linux environment
+
+```bash
+export HF_ENDPOINT=https://hf-mirror.com
+export HF_HOME=/data/ai_share/models
+```
+
+#### 3) Temporary File Permissions Issue
+
+The background needs some temporary storage during transcription, and by default, temporary files are saved to the `/tmp` directory. Therefore, before running `oddasr`, be sure to confirm that you have read and write permissions for the `/tmp` directory, <font color=red>**otherwise errors like the following will occur**</font>:
+
+```python
+(index):742 XHR status: 500 Response text: {"error":"ASR processing error: ASR sentence generate error: Failed to load audio file: local variable 'parent' referenced before assignment"}
+```
+
+## IV. How to Use OddASR?
+
+### 1. File ASR Transcription API
+
+Simply put your file path in a form and send it to OddASR via HTTP POST.
+
+```python
+def test_file(audio_path: str, output_format: str = "txt"):
+    # Set the service URL
+    url = "http://127.0.0.1:9002/v1/asr"
+    # Define hotwords
+    hotwords = "XiaoLuo XiaoLuoTongXue OddMeta XiaoAo"
+    # Open the audio file
+    with open(audio_path, "rb") as audio_file:
+        # Send POST request
+        response = requests.post(url, files={"audio": audio_file}, data={"hotwords": hotwords, "mode": "file", "output_format": output_format})
+        # Output results
+        if response.status_code == 200:
+            try:
+                print("Recognition Result:", response.json()["text"])
+            except ValueError:
+                print("Non-JSON response:", response.text)  # Print the raw response
+        else:
+            print("Error:", response.text)  # Print the raw error message
+```
+
+For specific examples, please refer to: https://github.com/oddmeta/oddasr/blob/master/testAPI.py
+
+The output format after transcription supports three formats:
+- txt: Text mode
+- spk: Speaker mode
+- srt: Subtitle mode
+
+Specific formats are shown below with examples.
+
+### 2. Streaming ASR Transcription API
+
+Streaming ASR transcription provides API interfaces via websocket. The entire API call flow is as follows:
+
+'''    
+    client --> server: connect
+    client --> server: TCmdApppyAsrReq, msg_type = StartTranscription;
+    server --> client: TCmdApplyAsrRes, msg_type = MSG_SUBSCRIBE_INIT_RES;
+    client --> server: TCMDTranscribeReq, msg_type = MSG_TRANSCRIBE_REQ;
+    server --> client: TCMDTranscribeRes, msg_type = MSG_TRANSCRIBE_RES;
+
+    TCMDTranscribeReq
+'''
+
+For specific examples, please refer to: https://github.com/oddmeta/oddasr/blob/master/testStreamAPI.py
+
+### 3. Sentence ASR Transcription API
+
+Same as the file ASR transcription API, but the output format only supports text mode, not speaker mode or subtitle mode.
+
+### 4. Test Script Examples
+
+- Test scripts
+    - **`testAPI.py`**: Example client script for testing the file mode of ASR API.
+    - **`testStreamAPI.py`**: Example client script for testing the streaming mode of ASR API.
+- Audio files
+    - **`test_cn_male9s.wav`**: Example audio file for testing.
+    - **`test_en_steve_jobs_10s.wav`**: Example audio file for testing.
+    - **`test_cn_16k-16bits-mono.wav`**: Example audio file for streaming ASR testing.
+
+
+#### 1) Test File ASR Transcription API
 
 Use the `testAPI.py` script to test the API:
+
 ```bash
 python testAPI.py test_en_steve_jobs_10s.wav txt
 ```
@@ -81,36 +215,38 @@ Example `curl` command:
 - Send an audio file to the REST API
 
 ```bash
-curl -X POST -F "audio=@path/to/audio.wav" http://127.0.0.1:9002/v1/asr
+curl -X POST -F "audio=@path/to/audio.wav" http://127.0.0.1:12340/v1/asr
 ```
 
 Example `curl` command for testing the `test_cn_male_9s.wav` audio file:
 
 ```bash
-curl -X POST -F "audio=@test_cn_male_9s.wav" http://127.0.0.1:9002/v1/asr
+curl -X POST -F "audio=@test_cn_male_9s.wav" http://127.0.0.1:12340/v1/asr
 ```
 
-there are two test audio files in the repo:
+There are two test audio files in the repository:
 
 - `test_cn_male9s.wav`
 - `test_en_steve_jobs_10s.wav`
 
-you can test them by:
+You can test them as follows:
 ```bash
-curl -X POST -F "audio=@test_cn_male_9s.wav" http://127.0.0.1:9002/v1/asr
-curl -X POST -F "audio=@test_en_steve_jobs_10s.wav" http://127.0.0.1:9002/v1/asr
+curl -X POST -F "audio=@test_cn_male_9s.wav" http://127.0.0.1:12340/v1/asr
+curl -X POST -F "audio=@test_en_steve_jobs_10s.wav" http://127.0.0.1:12340/v1/asr
 ```
 
-### 5. Test stream ASR API
-Use the `testStreamAPI.py` script to test the API, supports pcm and wav file as test input.
+#### 2) Test Streaming ASR Transcription API
+
+Use the `testStreamAPI.py` script to test the API, which supports pcm and wav files as test inputs.
 
 - **Limitations**
 
-<font color=red>OddAsr streaming mode current supports only <b>16K sample rate, 16 bit width, mono</b> audio as input.</font>
+<font color=red>OddAsr streaming mode currently only supports <b>16K sample rate, 16 bit width, mono</b> audio as input.</font>
 
-You need assure your input audio format before feeding them to OddAsr, otherwise the transcription result would not be the one you expected. You can refer to testStreamAPI.py as a demostration for the implementation of your own application.
+You need to ensure your input audio format before feeding it to OddAsr, otherwise the transcription result may not meet your expectations. You can refer to testStreamAPI.py as a demonstration for implementing your own application.
 
 - Input a pcm file as test input
+
 ```bash
 python testStreamAPI.py 111.pcm
 ```
@@ -120,201 +256,182 @@ python testStreamAPI.py 111.pcm
 ```bash
 python testStreamAPI.py test_cn_16k-16bits-mono.wav
 ```
-If your test input is a wav file, `testStreamAPI.py` will check sample rate and channel number, if not match, will raise error.
+
+If your test input is a wav file, `testStreamAPI.py` will check the sample rate and channel number, and will raise an error if they don't match.
 
 ```bash
 python testStreamAPI.py test_cn_16k-16bits-mono.wav --concurrency 4
 ```
+
 Simulate 4 real-time streaming requests to the server.
 
 
-### 6. Example output
+### 5. Example Output
 
-- text mode
-
-```bash
-是开始这个呃实时的一个转写。
-对， 然后是转写的一个效果， 大概大概就是这个样子。 
-然后的话那个在这里边你也可以去给他那个加一个人。 
-比如说是嗯我随便给他取一个名字， 
-就是连云端的还是自己算的连云端的吧。 
-```
-
-- spk mode
+#### 1) Text Mode
 
 ```bash
-发言人 0: 是开始这个呃实时的一个转写。
-发言人 0: 对，
-发言人 0: 然后是转写的一个效果，
-发言人 0: 大概大概就是这个样子。
-发言人 0: 然后的话那个在这里边你也可以去给他那个加一个人。
-发言人 0: 比如说是嗯我随便给他取一个名字，
-发言人 1: 就是连云端的还是自己算的连云端的吧。
-发言人 0: 呃本地的本地的本地的对，
-发言人 0: 不用连看能调吧。
-发言人 2: 这个还有对呀，
-发言人 0: 然后这里边可以给他加格。
+This is the start of this real-time transcription.
+Yes, then this is the transcription effect, roughly like this.
+Then you can also add a person to it here.
+For example, I'll give it a random name,
+Is it connected to the cloud or calculated locally? Connected to the cloud.
 ```
 
-- srt mode
+#### 2) Speaker Mode
 
 ```bash
-0 00:00:01,010 --> 00:00:04,865 发言人 0: 是开始这个呃实时的一个转写。 
-1 00:00:06,040 --> 00:00:06,280 发言人 0: 对， 
-2 00:00:06,640 --> 00:00:08,660 发言人 0: 然后是转写的一个效果， 
-3 00:00:08,680 --> 00:00:10,280 发言人 0: 大概大概就是这个样子。 
-4 00:00:10,280 --> 00:00:14,500 发言人 0: 然后的话那个在这里边你也可以去给他那个加一个人。 
-5 00:00:14,660 --> 00:00:19,665 发言人 0: 比如说是嗯我随便给他取一个名字， 
-6 00:00:20,440 --> 00:00:23,200 发言人 1: 就是连云端的还是自己算的连云端的吧。 
-7 00:00:23,240 --> 00:00:25,340 发言人 0: 呃本地的本地的本地的对， 
-8 00:00:25,340 --> 00:00:27,275 发言人 0: 不用连看能调吧。 
-9 00:00:29,120 --> 00:00:31,480 发言人 2: 这个还有对呀， 
-10 00:00:32,130 --> 00:00:33,885 发言人 0: 然后这里边可以给他加格。 
+Speaker 0: This is the start of this real-time transcription.
+Speaker 0: Yes,
+Speaker 0: then this is the transcription effect,
+Speaker 0: roughly like this.
+Speaker 0: Then you can also add a person to it here.
+Speaker 0: For example, I'll give it a random name,
+Speaker 1: Is it connected to the cloud or calculated locally? Connected to the cloud.
+Speaker 0: Local, local, local. Yes,
+Speaker 0: No need to connect, can it be adjusted?
+Speaker 2: This also works,
+Speaker 0: Then you can add a grid to it here.
 ```
 
----
-
-## Repository Contents
-
-### 1. Core Files
-- **`main_server.py`**: Implements the REST API server for ASR transcription.
-- **`main_local.py`**: A standalone Python implementation for local ASR transcription.
-- **`odd_asr_app.py`**: Main application file for running the REST API server.
-- **`odd_asr_config.py`**: Custom configurations for the project.
-- **`odd_asr_exception.py`**: Custom exception classes for the project.
-- **`odd_asr_result.py`**: Result classes for the project.
-- **`odd_asr.py`**: File ASR class for the project.
-- **`odd_asr_stream.py`**: Stream ASR class for the project.
-- **`odd_wss_server.py`**: Websocket server class for streaming ASR.
-- **`utils_speech.py`**: Utility functions used by the REST API which was origined from FunASR repo.
-- **`log.py`**: Logging configuration for the project.
-- **`router/asr_api.py`**: Defines the API endpoints for the REST API.
-- **`router/asr_front.py`**: Defines the front-end endpoints for the REST API.
-
-### 2. Testing and Examples
-- **`testAPI.py`**: Example client script to test the file mode of ASR API.
-- **`testStreamAPI.py`**: Example client script to test the streaming mode of ASR API.
-
-### 3. Audio Files
-- **`test_cn_male9s.wav`**: Example audio file for testing.
-- **`test_en_steve_jobs_10s.wav`**: Example audio file for testing.
-- **`test_cn_16k-16bits-mono.wav`**: Example audio file for streaming ASR testing.
-
-### 4. Deployment Files
-
-- **`Dockerfile`**: Dockerfile for building GPU-accelerated Docker images (NVIDIA GPU deployment).
-- **`Dockerfile_CPU`**: Dockerfile for building Docker images for simple CPU-based deployments.
-
-### 5. Additional Files
-
-- **`requirements.txt`**: Python dependencies required for the project.
-
----
-
-## Features
-
-### 1. REST API for ASR
-
-- `main_server.py`Provides a REST API endpoint for audio file transcription.
-- Built using Flask.
-- Example usage: `python main_server.py`.
-
-### 2. Docker Support
-
-- Includes Dockerfiles for both GPU and CPU deployment.
-- Simplifies deployment on servers with or without GPU support.
-
-*BTW: I don't have a GPU to run test for GPU deployment, help wanted!*
-
----
-
-## Docker Deployment
-
-### 1. Install Docker
+#### 3) SRT Mode
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y docker.io
+0 00:00:01,010 --> 00:00:04,865 Speaker 0: This is the start of this real-time transcription.
+1 00:00:06,040 --> 00:00:06,280 Speaker 0: Yes,
+2 00:00:06,640 --> 00:00:08,660 Speaker 0: then this is the transcription effect,
+3 00:00:08,680 --> 00:00:10,280 Speaker 0: roughly like this.
+4 00:00:10,280 --> 00:00:14,500 Speaker 0: Then you can also add a person to it here.
+5 00:00:14,660 --> 00:00:19,665 Speaker 0: For example, I'll give it a random name,
+6 00:00:20,440 --> 00:00:23,200 Speaker 1: Is it connected to the cloud or calculated locally? Connected to the cloud.
+7 00:00:23,240 --> 00:00:25,340 Speaker 0: Local, local, local. Yes,
+8 00:00:25,340 --> 00:00:27,275 Speaker 0: No need to connect, can it be adjusted?
+9 00:00:29,120 --> 00:00:31,480 Speaker 2: This also works,
+10 00:00:32,130 --> 00:00:33,885 Speaker 0: Then you can add a grid to it here.
 ```
 
-Visit https://docs.oddmeta.net/#/engine-api/install_docker_on_ubuntu or https://docs.docker.com/engine/install/ubuntu/ for more details.
+## V. Customize Your Own OddASR Configuration
 
-### 2. CPU Deployment
+Regarding the custom configuration function of OddASR, my initial idea was to add parameters in the command line so that users could customize the startup directly through command line parameters. However, there are too many parameters I need to support, so I gave up the command line parameter approach and directly used a configuration file instead.
 
-```bash
-docker build -t oddasr-cpu:v0.1.0 .
-docker run -d -p 9002:9002 -p 8101:8101 --name oddasr-cpu oddasr-cpu:v0.1.0
+Therefore, the current version of OddASR has removed the command line parameter custom configuration function and switched to using configuration files.
+
+### 1. Default Configuration
+
+By default, oddasr uses the address 0.0.0.0 and binds an HTTP port 9002 and a websocket port 8101.
+
+Main configuration items are as follows:
+
+- `HOST`: HTTP port configuration, default port number 9002. Used for file ASR transcription, as well as some demos and management functions.
+- `WS_PORT`: Websocket port configuration, default port number 8101. Used for streaming ASR transcription.
+- `preload_model`: Whether to preload models at startup, default True, so that it can respond quickly after receiving ASR transcription requests. Loading models is slow, from seconds to tens of seconds, depending on your CPU, memory hardware configuration, and the number of loaded instances.
+- `enable_gpu`: Whether to enable GPU, default False, not using GPU.
+- `disable_stream`: Streaming ASR transcription is enabled by default, default False.
+- `concurrent_thread`: Number of concurrent threads, default 0, i.e., default to start threads with CPU cores.
+- `max_instance`: Maximum number of instances, default 1, i.e., only supporting one concurrent transcription. If your hardware configuration is sufficient, you can set the maximum number of instances to a larger value to allow your OddASR to support more concurrent requests.
+
+### 2. Complete Configuration Items
+
+Specifically as follows:
+
+```python
+DEFAULT_CONFIG = {
+    "HOST": "0.0.0.0",
+    "PORT": 9002,                          # HTTP port
+    "WS_HOST": "0.0.0.0",
+    "WS_PORT": 8101,                       # Websocket port
+    "Debug": False,
+    "odd_asr_cfg": {
+        "preload_model": True,             # Preload models at startup to
+        "enable_gpu": False,               # Default not to use GPU
+        "disable_stream": False,           # Default to enable streaming ASR transcription
+        "concurrent_thread": 0,            # Default to start threads with CPU cores
+        "asr_stream_cfg": {
+            'max_instance': 1,              # Maximum number of streaming ASR transcription instances
+            'save_audio': False,
+            'punct_mini_len': 10,
+            'punct_time_mini_force_trigger': 3,
+            'free_resource_timeout': 5,
+            'force_final_result': 20,
+            'vad_threshold': 0.8,
+            'vad_min_speech_duration': 300,
+            'vad_min_silence_duration': 200
+        },
+        "asr_file_cfg": {
+            'max_instance': 1,              # Maximum number of file ASR transcription instances
+            'save_audio': False,
+            'punct_mini_len': 10,
+            'punct_time_mini_force_trigger': 3,
+            'free_resource_timeout': 5,
+            'force_final_result': 20,
+            'vad_threshold': 0.8,
+            'vad_min_speech_duration': 300,
+            'vad_min_silence_duration': 200
+        },
+        "asr_sentence_cfg": {
+            'max_instance': 1,              # Maximum number of sentence ASR transcription instances
+            'save_audio': False,
+            'punct_mini_len': 10,
+            'punct_time_mini_force_trigger': 3,
+            'free_resource_timeout': 5,
+            'force_final_result': 20,
+            'vad_threshold': 0.8,
+            'vad_min_speech_duration': 300,
+            'vad_min_silence_duration': 200
+        },
+        "enable_https": False,
+        "ssl_cert_path": "scripts/cert.pem",
+        "ssl_key_path": "scripts/key.pem",
+    },
+    "odd_asr_slp_cfg": {
+        "sensitive_words": {
+            "path": "scripts/sensitivewords",   # Path to sensitive words
+        },
+        "hotwords": {
+            "path": "scripts/hotwords",        # Path to hotwords
+        }
+    },
+    "db_cfg": {
+        "db_engine": "sqlite",
+        "db_name": "oddasr.db",
+        "db_user": "",
+        "db_password": "",
+        "db_host": "",
+        "db_port": "",
+    },
+    "redis_cfg": {
+        "redis_enabled": False,
+        "redis_host": "127.0.0.1",
+        "redis_port": 7379,
+        "redis_password": "",
+    },
+    "log_file": "oddasr.log",
+    "log_path": "logs/",
+    "log_level": 10,
+    "asr": {'liveasr':'', 'appid':'oddasrtest', 'secret':'oddasrtest'},
+    "Users": 'oddasr_users.json'
+}
 ```
-
-### 3. GPU Deployment
-
-```bash
-docker build -f Dockerfile_GPU -t oddasr-gpu:v0.1.0 .
-docker run -d -p 9002:9002 -p 8101:8101 --name oddasr-gpu oddasr-gpu:v0.1.0
-```
-
-### 4. About running oddasr container
-
-In the first run of oddasr container, it will download the model files from the internet, this would take quite sometime, from 10 minutes to more, depends on the bandwith of your internet.
-Even not for the first run, oddasr server still need a few minutes to startup, because we will load the model on startup to speed up the incoming ASR requests.
-
-You can use `docker logs -t oddasr` to check the download progress. If you find logs like below, it means oddasr has already download the model files, running and working.
-
-```
-2025-07-25T08:22:08.090277794Z 2025-07-25 08:22:08 INFO odd_asr_result.py:95 (1-124264901494464) - => Start ASR result dispatch Task Success 
-2025-07-25T08:22:08.093144025Z WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
-2025-07-25T08:22:08.093187031Z  * Running on all addresses (0.0.0.0)
-2025-07-25T08:22:08.093201526Z  * Running on http://127.0.0.1:9002
-2025-07-25T08:22:08.093213810Z  * Running on http://172.17.0.2:9002
-2025-07-25T08:22:08.093226351Z Press CTRL+C to quit
-2025-07-25T08:22:08.372302454Z 2025-07-25 08:22:08,371 - modelscope - INFO - Use user-specified model revision: v2.0.4
-2025-07-25T08:22:11.962184545Z 2025-07-25 08:22:11 DEBUG odd_asr_result.py:64 (1-124264901494464) - =============================================notifyTask: start=================================== 
-```
-
-### 5. Some docker commands for Docker newbies
-- run oddasr container: `docker run -d -p 9002:12345 -p 8101:12346 --name oddasr-cpu oddasr-cpu:v0.1.0`
-- list all running containers: `docker ps`
-- print container logs: `docker logs -t oddasr-cpu`
-- enter bash of your container: `docker exec -it oddasr-cpu bash`
-- stop oddasr container: `docker stop oddasr-cpu`
-- remove container: `docker rm oddasr-cpu`
-- list container images: `docker images`
-- remove image: `docker rmi IMAGE-ID`. `IMAGE-ID` is the image id, you can get it from `docker images`
 
 ---
 
-## TODO
+## VII. TODO List
 
-- [ ] Add more models and features.
-- [ ] Support realtime ASR.
-- [ ] Add more customized options.
-   - [ ] --output_format: txt表示纯文本, spk表示根据VAD分段后每个段落前面加发言人，srt表示在spk基础上为每个段落加一个段落在音频文件中的时间位置
-   - [ ] --hotword 热词文件，每行一个热词，格式(热词 权重)：阿里巴巴 20
-- [ ] Simple UI for oddasr to demostrate.
-- [ ] Support voiceprint recognition!!! [小落同学](https://x.oddmeta.net) really need this feature!!!
-- [ ] Other enhancements
-   - [ ] --thread_num 设置并发发送线程数，默认为1
-   - [ ] --audio_in 需要进行转写的音频文件，支持服务器本地/远程文件路径，文件列表wav.scp
-   - [ ] --ssl 设置是否开启ssl证书校验，默认1开启，设置为0关闭
-   - [ ] --use_itn 设置是否使用itn，默认1开启，设置为0关闭
-
----
-
-## Limitations
-
-- ~~Only supports **non-realtime** ASR transcription.~~
-- Only supports **audio files** as input.
+- [ ] Add more models and features. Especially since I saw the FunASR-nano version model come out a few days ago, I've been wanting to try the effect, but I haven't had time.
+- [ ] Add more custom options.
+   - [ ] --output_format: txt means plain text, spk means adding speaker before each paragraph after VAD segmentation, srt means adding the time position of each paragraph in the audio file on top of spk
+   - [ ] --hotword Hotword file, one hotword per line, format (hotword weight): Alibaba 20
+- [ ] Add a simple UI demo for oddasr.
+- [ ] Support voiceprint recognition!!! [XiaoLuo TongXue](https://x.oddmeta.net) really needs this feature!!!
+- [ ] Other enhanced features
+   - [ ] --thread_num Set the number of concurrent sending threads, default 1
+   - [ ] --audio_in Audio files to be transcribed, supporting server local/remote file paths, file list wav.scp
+   - [ ] --ssl Set whether to enable SSL certificate verification, default 1 enabled, set to 0 disabled
+   - [ ] --use_itn Set whether to use itn, default 1 enabled, set to 0 disabled
 
 ---
 
-## References
+## VIII. License
 
-- [FunASR](https://github.com/modelscope/FunASR): The ASR framework used in this project.
-- [Flask](https://github.com/pallets/flask): The web framework used for the REST API, which is based on Werkzeug and Jinja.
-- [funasr-python-api](https://github.com/open-yuhaoz/funasr-python-api): Python api written by funasr server post
-
----
-
-## License
-This project is NOT licensed under any License.
-Copy free, without any string attached! Just happy coding!
+The OddASR project does not have any license.
+Copy freely, without any strings attached! Just happy coding!
