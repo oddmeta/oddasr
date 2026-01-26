@@ -4,6 +4,7 @@
   "WS_HOST": "0.0.0.0",
   "WS_PORT": 8101,
   "Debug": false,
+
   "odd_asr_cfg": {
     "preload_model": true,
     "enable_gpu": false,
@@ -18,7 +19,41 @@
       "force_final_result": 20,
       "vad_threshold": 0.8,
       "vad_min_speech_duration": 300,
-      "vad_min_silence_duration": 200
+      "vad_min_silence_duration": 200,
+      "models":
+      {
+        "selected_combination": 0,
+        "combinations":[
+          {
+            "asr": 
+              {
+                "model": "paraformer-zh-streaming",
+                "mode": "",
+                "revision": "v2.0.4"
+              },
+            "punc":
+              {
+                "model": "iic/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727",
+                "mode": "",
+                "revision": "v2.0.4"
+              }
+          },
+          {
+            "asr": 
+              {
+                "model": "FunAudioLLM/Fun-ASR-Nano-2512",
+                "mode": "paraformer_streaming",
+                "revision": ""
+              },
+            "punc":
+              {
+                "model": "iic/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727",
+                "mode": "",
+                "revision": "v2.0.4"
+              }
+          }
+        ]
+      }
     },
     "asr_file_cfg": {
       "max_instance": 1,

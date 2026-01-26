@@ -53,6 +53,10 @@ class OddAsrStats:
 
 
 class OddAsrParamsStream:
+    """
+    OddAsrParamsStream
+    """
+    # mode: stream, file, pipeline
     _mode: str = "stream"
     _hotwords: str = "oddmeta xiaoluo"
     _rec_file:str =""
@@ -76,6 +80,14 @@ class OddAsrParamsStream:
     _stats = OddAsrStats()
     task_id = None
 
+    _model_asr_model: str = "paraformer-zh-streaming"
+    _model_asr_mode: str = "Fun-ASR-Nano-2512"
+    _model_asr_revision: str = "v2.0.4"
+    _model_punc_model: str = "iic/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727"
+    _model_punc_mode: str = ""
+    _model_punc_revision: str = "v2.0.4"
+
+
     def __init__(self, 
                  mode="stream", 
                  hotwords="", 
@@ -87,6 +99,7 @@ class OddAsrParamsStream:
                  chunk_size=[0, 10, 5], 
                  encoder_chunk_look_back=4, 
                  decoder_chunk_look_back=1,
+                 combined_index: int = 0,
                  ):
         self._mode = mode  # mode should be a string like 'file','stream', 'pipeline'
         self._hotwords = hotwords  # hotwords should be a string like 'word1 word2'
@@ -135,6 +148,15 @@ class OddAsrParamsStream:
             raise ValueError("chunk_size[1] should be between 0 and 60000, in ms")
         if self._chunk_size[2] < 0 or self._chunk_size[2] > 60000:
             raise ValueError("chunk_size[2] should be between 0 and 60000, in ms")
+
+        self._combined_index = combined_index
+        self._model_asr_model = config.odd_asr_cfg["combinations"][self._combined_index]["asr"]["model"]
+        self._model_asr_mode = config.odd_asr_cfg["combinations"][self._combined_index]["asr"]["mode"]
+        self._model_asr_revision = config.odd_asr_cfg["combinations"][self._combined_index]["asr"]["revision"]
+
+        self._model_punc_model = config.odd_asr_cfg["combinations"][self._combined_index]["punc"]["model"]
+        self._model_punc_mode = config.odd_asr_cfg["combinations"][self._combined_index]["punc"]["mode"]
+        self._model_punc_revision = config.odd_asr_cfg["combinations"][self._combined_index]["punc"]["revision"]
         
     def _default_callback(self, result):
 
@@ -205,16 +227,11 @@ class OddAsrStream:
         # load stream model
         if not self.stream_model:
             self.stream_model = AutoModel(
-                model="paraformer-zh-streaming", model_revision="v2.0.4",
+                # model="paraformer-zh-streaming", 
+                # model_revision="v2.0.4",
+                model=self.streamParam._model_asr_model,
+                model_revision=self.streamParam._model_asr_revision,
 
-                # vad_model='iic/speech_fsmn_vad_zh-cn-16k-common-pytorch', vad_model_revision="v2.0.4",
-                # vad_model="fsmn-vad", vad_model_revision="v2.0.4",
-
-                # punc_model='iic/punc_ct-transformer_cn-en-common-vocab471067-large', punc_model_revision="v2.0.4",
-                # punc_model='iic/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727-large', punc_model_revision="v2.0.4",
-                # punc_model='iic/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727', punc_model_revision="v2.0.4",
-
-                # spk_model="cam++",
                 log_level="debug",
                 hub="ms",  # hub：表示模型仓库，ms为选择modelscope下载，hf为选择huggingface下载。
                 device=device,
@@ -244,7 +261,11 @@ class OddAsrStream:
 
             self.punc_model = AutoModel(
                 # model='iic/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727-large', punc_model_revision="v2.0.4",
-                model="iic/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727", model_revision="v2.0.4",
+
+                # model="iic/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727", 
+                # model_revision="v2.0.4",
+                model=self.streamParam._model_punc_model,
+                model_revision=self.streamParam._model_punc_revision,
                 hub="ms",  # hub：表示模型仓库，ms为选择modelscope下载，hf为选择huggingface下载。
                 device=device,
                 disable_update=True,
