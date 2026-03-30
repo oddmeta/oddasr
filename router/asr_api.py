@@ -43,7 +43,7 @@ def transcribe_sentence():
         
         # get mode from request if provided
         mode = request.form.get('mode', "file")  # mode should be a string like 'file', 'stream', 'pipeline'
-        output_format = request.form.get('output_format', "txt")  # output_format should be a string like 'txt', 'srt', 'spk'
+        output_format = request.form.get('output_format', "text")  # output_format should be a string like 'text', 'srt', 'spk'
         hotwords = request.form.get('hotwords', "")  # hotwords should be a string like 'word1 word2'
 
         # Create a temporary file with proper permissions
@@ -128,7 +128,7 @@ def transcribe():
         
         # get mode from request if provided
         mode = request.form.get('mode', "file")  # mode should be a string like 'file', 'stream', 'pipeline'
-        output_format = request.form.get('output_format', "txt")  # output_format should be a string like 'txt', 'srt', 'spk'
+        output_format = request.form.get('output_format', "text")  # output_format should be a string like 'text', 'srt', 'spk'
         hotwords = request.form.get('hotwords', "")  # hotwords should be a string like 'word1 word2'
 
         # Create a temporary file with proper permissions

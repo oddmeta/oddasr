@@ -83,7 +83,7 @@ class OddAsrSentence:
         )
         logger.info("Model loaded successfully.")
 
-    def transcribe_sentence(self, audio_file, hotwords="", output_format="txt"):
+    def transcribe_sentence(self, audio_file, hotwords="", output_format="text"):
         self.set_busy(True)
         try:
             # check audio file exists
@@ -189,7 +189,7 @@ class OddAsrSentence:
                         output_text = "\n".join(subtitles)
                     else:
                         output_text = result[0]["text"] if isinstance(result, list) and len(result) > 0 and "text" in result[0] else ""
-                elif output_format == "txt":
+                elif output_format == "text":
                     output_text = result[0]["text"] if isinstance(result, list) and len(result) > 0 and "text" in result[0] else ""
                 else:
                     output_text = result[0]["text"] if isinstance(result, list) and len(result) > 0 and "text" in result[0] else ""

@@ -4,7 +4,7 @@
 @contact: EMAIL@contact: catherine@oddmeta.com
 @software: PyCharm 
 @file: odd_asr_app.py 
-@info: 消息模版
+@info: Flask 应用定义 - 创建 Flask app 对象，注册 blueprints、中间件、错误处理
 """
 
 import werkzeug.utils
@@ -40,3 +40,4 @@ def add_cache_control(response):
     return response
 
 import oddasr.router.asr_api
+import oddasr.router.openai_api

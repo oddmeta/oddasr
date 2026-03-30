@@ -4,7 +4,8 @@
 @contact: EMAIL@contact: catherine@oddmeta.com
 @software: PyCharm 
 @file: main_server.py 
-@info: 消息模版
+@info: 启动入口 - 服务启动脚本，负责初始化 ASR 实例、WebSocket 服务器、调度任务，然后启动 Flask HTTP 服务器
+@time: 2023/07/05
 """
 import argparse
 import threading

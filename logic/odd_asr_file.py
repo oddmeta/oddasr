@@ -15,7 +15,7 @@ import threading
 import os
 from funasr import AutoModel
 
-from oddasr.logic.utils_speech import convert_pcm_to_float, convert_time_to_millis, text_to_srt
+from oddasr.logic.utils_speech import convert_pcm_to_float, convert_time_to_millis, text_to_srt, text_to_vtt
 from oddasr.log import logger
 import oddasr.odd_asr_config as config
 
@@ -83,7 +83,7 @@ class OddAsrFile:
         )
         logger.info("Model loaded successfully.")
 
-    def transcribe_file(self, audio_file, hotwords="", output_format="txt"):
+    def transcribe_file(self, audio_file, hotwords="", output_format="text"):
         self.set_busy(True)
         try:
             # check audio file exists
@@ -158,8 +158,9 @@ class OddAsrFile:
             logger.info(f"ASR result: {result}")
     
             try:
-                if output_format == "raw":
+                if output_format == "raw" or output_format == "json" or output_format == "verbose_json":
                     output_text = result
+
                 elif output_format == "srt":
                     # Check if sentence_info exists in result
                     if isinstance(result, list) and len(result) > 0 and "sentence_info" in result[0]:
@@ -177,6 +178,24 @@ class OddAsrFile:
                         output_text = "\n".join(subtitles)
                     else:
                         output_text = result[0]["text"] if isinstance(result, list) and len(result) > 0 and "text" in result[0] else ""
+
+                elif output_format == "vtt":
+                    if isinstance(result, list) and len(result) > 0 and "sentence_info" in result[0]:
+                        sentences = result[0]["sentence_info"]
+                        subtitles = []
+
+                        logger.debug(f"sentence_info: {sentences[:2]}...")
+
+                        for idx, sentence in enumerate(sentences):
+                            sub = text_to_vtt(idx=idx, speaker_id=sentence['spk'], 
+                                            msg=sentence['text'], start_microseconds=sentence['start'], 
+                                            end_microseconds=sentence['end'])
+                            subtitles.append(sub)
+
+                        output_text = "\n".join(subtitles)
+                    else:
+                        output_text = result[0]["text"] if isinstance(result, list) and len(result) > 0 and "text" in result[0] else ""
+
                 elif output_format == "spk":
                     # Check if sentence_info exists in result
                     if isinstance(result, list) and len(result) > 0 and "sentence_info" in result[0]:
@@ -190,7 +209,7 @@ class OddAsrFile:
                         output_text = "\n".join(subtitles)
                     else:
                         output_text = result[0]["text"] if isinstance(result, list) and len(result) > 0 and "text" in result[0] else ""
-                elif output_format == "txt":
+                elif output_format == "text":
                     output_text = result[0]["text"] if isinstance(result, list) and len(result) > 0 and "text" in result[0] else ""
                 else:
                     output_text = result[0]["text"] if isinstance(result, list) and len(result) > 0 and "text" in result[0] else ""

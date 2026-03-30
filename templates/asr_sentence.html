@@ -267,7 +267,7 @@
           const formData = new FormData();
           formData.append("audio", wavBlob, 'recording.wav');
           formData.append("mode", "file"); // 设置模式为file
-          formData.append("output_format", "txt"); // 设置输出格式为纯文本
+          formData.append("output_format", "text"); // 设置输出格式为纯文本
           
           // 检测是否启用热词
           if ($('input[name="enableHotword"]:checked').val() == 'on') {
