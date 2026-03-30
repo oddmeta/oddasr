@@ -159,7 +159,7 @@ def transcribe():
         # recognition with hotwords
         try:
             if mode == "file":
-                result = odd_asr_file.transcribe(audio_file=temp_path, hotwords=hotwords, output_format=output_format)
+                result = odd_asr_file.transcribe_file(audio_file=temp_path, hotwords=hotwords, output_format=output_format)
             else:
                 return_ok = False
                 result = f"unsupported mode: {mode}."

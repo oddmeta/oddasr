@@ -150,13 +150,13 @@ class OddAsrParamsStream:
             raise ValueError("chunk_size[2] should be between 0 and 60000, in ms")
 
         self._combined_index = combined_index
-        self._model_asr_model = config.odd_asr_cfg["combinations"][self._combined_index]["asr"]["model"]
-        self._model_asr_mode = config.odd_asr_cfg["combinations"][self._combined_index]["asr"]["mode"]
-        self._model_asr_revision = config.odd_asr_cfg["combinations"][self._combined_index]["asr"]["revision"]
+        self._model_asr_model = config.odd_asr_cfg["asr_stream_cfg"]["models"]["combinations"][self._combined_index]["asr"]["model"]
+        self._model_asr_mode = config.odd_asr_cfg["asr_stream_cfg"]["models"]["combinations"][self._combined_index]["asr"]["mode"]
+        self._model_asr_revision = config.odd_asr_cfg["asr_stream_cfg"]["models"]["combinations"][self._combined_index]["asr"]["revision"]
 
-        self._model_punc_model = config.odd_asr_cfg["combinations"][self._combined_index]["punc"]["model"]
-        self._model_punc_mode = config.odd_asr_cfg["combinations"][self._combined_index]["punc"]["mode"]
-        self._model_punc_revision = config.odd_asr_cfg["combinations"][self._combined_index]["punc"]["revision"]
+        self._model_punc_model = config.odd_asr_cfg["asr_stream_cfg"]["models"]["combinations"][self._combined_index]["punc"]["model"]
+        self._model_punc_mode = config.odd_asr_cfg["asr_stream_cfg"]["models"]["combinations"][self._combined_index]["punc"]["mode"]
+        self._model_punc_revision = config.odd_asr_cfg["asr_stream_cfg"]["models"]["combinations"][self._combined_index]["punc"]["revision"]
         
     def _default_callback(self, result):
 
