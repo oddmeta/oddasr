@@ -1,15 +1,18 @@
 # -*- coding: utf-8 -*-
 import os
 import tempfile
+import json
 
 from flask import Blueprint, request, jsonify
 from oddasr.log import logger
-from oddasr.logic.odd_asr_instance import find_free_odd_asr_file, find_free_odd_asr_sentence
+from oddasr.logic.odd_asr_instance import find_free_odd_asr_file
 from oddasr.logic.odd_asr_file import OddAsrFile
-from oddasr.logic.odd_asr_sentence import OddAsrSentence
-from oddasr.logic.utils_speech import text_to_srt
+from oddasr.logic.odd_asr_stream import OddAsrStream, OddAsrParamsStream
+import oddasr.odd_asr_config as config
 
 bp = Blueprint('openai', __name__, url_prefix='/v1')
+
+odd_asr_stream_set = set()
 
 SUPPORTED_MODELS = [
     {
@@ -33,6 +36,27 @@ SUPPORTED_MODELS = [
         "description": "Streaming ASR model for Chinese speech recognition"
     }
 ]
+
+def find_free_odd_asr_stream():
+    for odd_asr_stream in odd_asr_stream_set:
+        if not odd_asr_stream.is_busy():
+            return odd_asr_stream
+    return None
+
+def init_stream_instances():
+    max_instance = config.odd_asr_cfg["asr_stream_cfg"]["max_instance"]
+    if max_instance <= 0:
+        max_instance = 1
+    for i in range(max_instance):
+        odd_asr_stream_param = OddAsrParamsStream(
+            mode="stream",
+            hotwords="",
+            audio_rec_filename="",
+        )
+        odd_asr_stream = OddAsrStream(odd_asr_stream_param)
+        odd_asr_stream_set.add(odd_asr_stream)
+
+init_stream_instances()
 
 SUPPORTED_FORMATS = ["json", "text", "srt", "verbose_json", "vtt"]
 

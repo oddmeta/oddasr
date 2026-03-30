@@ -13,9 +13,8 @@ import asyncio
 import signal
 import sys
 from time import sleep
-from werkzeug.serving import run_simple
 
-from oddasr.odd_asr_app import app
+from oddasr.odd_asr_app import app, socketio
 from oddasr.logic.odd_asr_instance import init_instance_file, init_instance_sentence
 from oddasr.logic.odd_wss_server import init_instances_stream, start_wss_server
 from oddasr.logic.scheduled_task import ScheduledTask
@@ -105,20 +104,20 @@ O   O  d   d  d   d  M   M  e        t    a     a
     scheduled_task.start()
     logger.info("Scheduled task thread started.")
 
-    # Start Flask server with HTTPS support
+    # Start Flask-SocketIO server with HTTPS support
     logger.info(f"Starting server on {'https' if config.odd_asr_cfg['enable_https'] else 'http'}://{config.HOST}:{config.PORT}")
     
-    # 使用Werkzeug的run_simple替代app.run()，这样可以更好地控制服务器
+    # 使用Flask-SocketIO运行服务器
     ssl_context = None
     if config.odd_asr_cfg["enable_https"]:
         ssl_context = (config.odd_asr_cfg["ssl_cert_path"], config.odd_asr_cfg["ssl_key_path"])
     
-    # 运行Flask服务器，直到shutdown_flag被设置
-    run_simple(
-        hostname=config.HOST,
+    socketio.run(
+        app,
+        host=config.HOST,
         port=config.PORT,
-        application=app,
-        use_reloader=False,  # 禁用自动重载
-        use_debugger=config.Debug,
-        ssl_context=ssl_context
+        debug=config.Debug,
+        ssl_context=ssl_context,
+        use_reloader=False,
+        allow_unsafe_werkzeug=True
     )

@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时语音转写 - OpenAI 兼容接口</title>
+    <link rel="stylesheet" href="plugins/fontawesome-free/css/all.min.css">
+    <link rel="stylesheet" href="dist/css/adminlte.min.css">
+    <style>
+        body {
+            background-color: #f4f6f9;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px 10px 0 0 !important;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-idle { background-color: #6c757d; }
+        .status-connecting { background-color: #ffc107; animation: pulse 1s infinite; }
+        .status-connected { background-color: #28a745; }
+        .status-recording { background-color: #dc3545; animation: pulse 1s infinite; }
+        .status-error { background-color: #dc3545; }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        #transcript {
+            min-height: 300px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-size: 16px;
+            line-height: 1.8;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            background-color: #fafafa;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        #transcript .final {
+            color: #212529;
+        }
+        
+        #transcript .interim {
+            color: #6c757d;
+            font-style: italic;
+        }
+        
+        .btn-record {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            font-size: 24px;
+            transition: all 0.3s;
+        }
+        
+        .btn-record.recording {
+            background-color: #dc3545;
+            color: white;
+            animation: pulse 1s infinite;
+        }
+        
+        .btn-record.idle {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .audio-visualizer {
+            height: 60px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        
+        .audio-visualizer canvas {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .info-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-microphone-alt mr-2"></i>
+                    实时语音转写 (OpenAI 兼容接口)
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="info-box">
+                    <i class="fas fa-info-circle mr-2"></i>
+                    点击"开始录音"按钮开始实时语音转写。支持中文语音识别，转写结果将实时显示在下方的文本框中。
+                </div>
+                
+                <div class="form-group">
+                    <label>连接状态：</label>
+                    <span id="status">
+                        <span class="status-indicator status-idle"></span>
+                        <span id="status-text">未连接</span>
+                    </span>
+                </div>
+                
+                <div class="audio-visualizer">
+                    <canvas id="visualizer"></canvas>
+                </div>
+                
+                <div class="text-center mb-4">
+                    <button id="btnRecord" class="btn-record idle" onclick="toggleRecording()">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <div class="mt-2">
+                        <span id="btnRecordText">开始录音</span>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>转写结果：</label>
+                    <div id="transcript"></div>
+                </div>
+                
+                <div class="stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="session-time">0:00</div>
+                        <div class="stat-label">会话时长</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="audio-chunks">0</div>
+                        <div class="stat-label">音频块数</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="transcript-length">0</div>
+                        <div class="stat-label">字符数</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <button class="btn btn-secondary" onclick="clearTranscript()">
+                    <i class="fas fa-trash mr-1"></i> 清空结果
+                </button>
+                <button class="btn btn-primary" onclick="copyTranscript()">
+                    <i class="fas fa-copy mr-1"></i> 复制结果
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="plugins/jquery/jquery.min.js"></script>
+    <script src="plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        let socket = null;
+        let mediaRecorder = null;
+        let audioContext = null;
+        let analyser = null;
+        let microphone = null;
+        let isRecording = false;
+        let sessionStartTime = null;
+        let audioChunkCount = 0;
+        let currentTranscript = '';
+        let interimTranscript = '';
+        
+        const SERVER_URL = window.location.origin;
+        
+        function updateStatus(status, text) {
+            const indicator = document.querySelector('.status-indicator');
+            const statusText = document.getElementById('status-text');
+            indicator.className = 'status-indicator status-' + status;
+            statusText.textContent = text;
+        }
+        
+        function updateStats() {
+            if (sessionStartTime) {
+                const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                document.getElementById('session-time').textContent = 
+                    `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+            document.getElementById('audio-chunks').textContent = audioChunkCount;
+            document.getElementById('transcript-length').textContent = currentTranscript.length;
+        }
+        
+        function initVisualizer() {
+            const canvas = document.getElementById('visualizer');
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            function draw() {
+                if (!analyser) {
+                    requestAnimationFrame(draw);
+                    return;
+                }
+                
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                analyser.getByteTimeDomainData(dataArray);
+                
+                ctx.fillStyle = '#f0f0f0';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#667eea';
+                ctx.beginPath();
+                
+                const sliceWidth = canvas.width / bufferLength;
+                let x = 0;
+                
+                for (let i = 0; i < bufferLength; i++) {
+                    const v = dataArray[i] / 128.0;
+                    const y = v * canvas.height / 2;
+                    
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                    x += sliceWidth;
+                }
+                
+                ctx.lineTo(canvas.width, canvas.height / 2);
+                ctx.stroke();
+                
+                requestAnimationFrame(draw);
+            }
+            
+            draw();
+        }
+        
+        async function initAudio() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        sampleRate: 16000,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true
+                    } 
+                });
+                
+                audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                    sampleRate: 16000
+                });
+                
+                microphone = audioContext.createMediaStreamSource(stream);
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 2048;
+                microphone.connect(analyser);
+                
+                initVisualizer();
+                
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: 'audio/webm;codecs=opus'
+                });
+                
+                mediaRecorder.ondataavailable = async (event) => {
+                    if (event.data.size > 0 && socket && socket.connected) {
+                        const arrayBuffer = await event.data.arrayBuffer();
+                        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+                        socket.emit('input_audio_buffer.append', { audio: base64 });
+                        audioChunkCount++;
+                        
+                        if (audioChunkCount % 10 === 0) {
+                            socket.emit('input_audio_buffer.commit', {});
+                        }
+                        
+                        updateStats();
+                    }
+                };
+                
+                mediaRecorder.start(200);
+                return true;
+            } catch (error) {
+                console.error('Error initializing audio:', error);
+                updateStatus('error', '音频初始化失败: ' + error.message);
+                return false;
+            }
+        }
+        
+        function connectSocket() {
+            socket = io(SERVER_URL, {
+                transports: ['websocket', 'polling']
+            });
+            
+            socket.on('connect', () => {
+                console.log('Socket connected:', socket.id);
+                updateStatus('connected', '已连接');
+            });
+            
+            socket.on('disconnect', () => {
+                console.log('Socket disconnected');
+                updateStatus('idle', '已断开');
+            });
+            
+            socket.on('session.created', (data) => {
+                console.log('Session created:', data.id);
+                sessionStartTime = Date.now();
+                updateStats();
+            });
+            
+            socket.on('session.updated', (data) => {
+                console.log('Session updated:', data);
+            });
+            
+            socket.on('input_audio_buffer.committed', () => {
+                console.log('Audio buffer committed');
+            });
+            
+            socket.on('conversation.item.transcript', (data) => {
+                if (data.is_final) {
+                    currentTranscript += data.transcript + '\n';
+                    interimTranscript = '';
+                    document.getElementById('transcript').innerHTML = 
+                        '<span class="final">' + escapeHtml(currentTranscript) + '</span>';
+                } else {
+                    interimTranscript = data.transcript;
+                    document.getElementById('transcript').innerHTML = 
+                        '<span class="final">' + escapeHtml(currentTranscript) + '</span>' +
+                        '<span class="interim">' + escapeHtml(interimTranscript) + '</span>';
+                }
+                updateStats();
+                scrollToBottom();
+            });
+            
+            socket.on('transcript.done', (data) => {
+                console.log('Transcript done:', data);
+            });
+            
+            socket.on('error', (data) => {
+                console.error('Socket error:', data);
+                updateStatus('error', '错误: ' + (data.error?.message || '未知错误'));
+            });
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function scrollToBottom() {
+            const transcript = document.getElementById('transcript');
+            transcript.scrollTop = transcript.scrollHeight;
+        }
+        
+        async function toggleRecording() {
+            const btn = document.getElementById('btnRecord');
+            const btnText = document.getElementById('btnRecordText');
+            
+            if (!isRecording) {
+                updateStatus('connecting', '连接中...');
+                
+                connectSocket();
+                
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                const audioInit = await initAudio();
+                if (!audioInit) {
+                    return;
+                }
+                
+                isRecording = true;
+                btn.classList.remove('idle');
+                btn.classList.add('recording');
+                btn.innerHTML = '<i class="fas fa-stop"></i>';
+                btnText.textContent = '停止录音';
+                updateStatus('recording', '录音中...');
+            } else {
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    mediaRecorder.stop();
+                    mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                }
+                
+                if (socket && socket.connected) {
+                    socket.emit('input_audio_buffer.clear', {});
+                    socket.disconnect();
+                }
+                
+                if (audioContext) {
+                    audioContext.close();
+                    audioContext = null;
+                }
+                
+                isRecording = false;
+                btn.classList.remove('recording');
+                btn.classList.add('idle');
+                btn.innerHTML = '<i class="fas fa-microphone"></i>';
+                btnText.textContent = '开始录音';
+                updateStatus('idle', '未连接');
+            }
+        }
+        
+        function clearTranscript() {
+            currentTranscript = '';
+            interimTranscript = '';
+            document.getElementById('transcript').innerHTML = '';
+            audioChunkCount = 0;
+            sessionStartTime = null;
+            updateStats();
+        }
+        
+        function copyTranscript() {
+            const text = currentTranscript.trim();
+            if (text) {
+                navigator.clipboard.writeText(text).then(() => {
+                    alert('复制成功!');
+                }).catch(err => {
+                    console.error('复制失败:', err);
+                });
+            } else {
+                alert('没有可复制的内容');
+            }
+        }
+        
+        setInterval(updateStats, 1000);
+    </script>
+</body>
+</html>

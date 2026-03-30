@@ -1,4 +1,7 @@
 Flask==3.1.1
+Flask-SocketIO==5.4.2
+python-socketio==5.12.2
+python-engineio==4.10.2
 librosa
 addict==2.4.0
 modelscope==1.9.5

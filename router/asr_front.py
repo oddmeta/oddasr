@@ -23,6 +23,10 @@ def asr_file():
 def asr_sentence():
     return render_template('asr_sentence.html', servercfg=config.asr)
 
+@bp.route('/asr_realtime.html')
+def asr_realtime():
+    return render_template('asr_realtime.html')
+
 @bp.route('/login', methods=['POST'])
 def login():
     try:
