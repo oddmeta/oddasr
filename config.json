@@ -16,6 +16,7 @@
       "punct_mini_len": 10,
       "punct_time_mini_force_trigger": 3,
       "free_resource_timeout": 5,
+      "cache_flush_timeout": 2,
       "force_final_result": 20,
       "vad_threshold": 0.8,
       "vad_min_speech_duration": 300,

@@ -48,6 +48,7 @@ class OddAsrStats:
         self.total_asr_len = 0                      # 转写总长度
         self.total_asr_time = 0                     # 转写总时间
         self.last_recv_timestamp: float = 0.0       # 最后一次接收音频的时间戳
+        self.last_cache_update_timestamp: float = 0.0  # 最后一次缓存更新的时间戳
         self.last_reply_par_timestamp: float = 0.0  # 最后一次回复中间结果的时间戳
         self.last_reply_fin_timestamp: float = 0.0  # 最后一次生成最终结果的时间戳
 
@@ -375,7 +376,10 @@ class OddAsrStream:
                     # 数据不足chunk_stride，存入缓存
                     with self.lock:  # 使用锁保护共享资源访问
                         self.streamParam._audio_cache = combined_data.copy()  # 创建数据副本
-
+                
+                # 更新缓存更新时间戳
+                self.streamParam._stats.last_cache_update_timestamp = time.time()
+                
                 self.streamParam._stats.total_audio_recv_len += len(audio_frame)
                 self.streamParam._stats.last_recv_timestamp = time.time()
 
@@ -545,6 +549,19 @@ class OddAsrStream:
                 except queue.Empty:  # sleep 100ms if read timeout
                     time.sleep(0.1)
                     timediff = time.time() - self.streamParam._stats.last_recv_timestamp
+                    
+                    # 检查缓存是否需要刷新（当缓存中有数据但长时间未收到新音频时）
+                    cache_flush_timeout = config.odd_asr_cfg["asr_stream_cfg"].get("cache_flush_timeout", 2)
+                    if self.streamParam._audio_cache.size > 0:
+                        cache_timediff = time.time() - self.streamParam._stats.last_cache_update_timestamp
+                        if cache_timediff > cache_flush_timeout:
+                            logger.info(f"Cache timeout ({cache_flush_timeout}s), flushing remaining audio data: {len(self.streamParam._audio_cache)} samples")
+                            cache_array = (self.streamParam._audio_cache * 32768).astype(np.int16)
+                            frame = AudioFrame(data=cache_array)
+                            self.streamParam._audio_queue.put(frame)
+                            self.streamParam._audio_cache = np.array([], dtype=np.float64)
+                            continue
+                    
                     # 5 seconds without receiving audio, stop the thread
                     if timediff > self.streamParam._free_resource_timeout:
                         logger.warn(f"No audio received for {self.streamParam._free_resource_timeout} seconds, stopping transcription thread.")
@@ -591,7 +608,7 @@ class OddAsrStream:
                     ## STEP 3.1 VAD
                     vad_result = self._generate_vad_data(audio_chunk)
                     if vad_result and not vad_result.is_speech:
-                        logger.debug(f"No speech detected in chunk {i}, skipping...")
+                        logger.warning(f"No speech detected in chunk {i}, skipping...")
                         continue
 
                     # STEP 4. Transcribe the audio chunk
