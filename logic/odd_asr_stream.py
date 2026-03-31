@@ -80,8 +80,8 @@ class OddAsrParamsStream:
     _stats = OddAsrStats()
     task_id = None
 
-    _model_asr_model: str = "paraformer-zh-streaming"
     _model_asr_mode: str = "Fun-ASR-Nano-2512"
+    _model_asr_model: str = "paraformer-zh-streaming"
     _model_asr_revision: str = "v2.0.4"
     _model_punc_model: str = "iic/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727"
     _model_punc_mode: str = ""
@@ -198,8 +198,9 @@ class OddAsrStream:
             if not is_busy:
                 logger.info(f"set_busy to False, clear _stop_event, websocket={self.streamParam._websocket}, task_id={self.streamParam.task_id}")
                 self.streamParam._stop_event.set()
-                self.streamParam._transcription_thread.join()
-                self.streamParam._transcription_thread = None
+                if self.streamParam._transcription_thread:
+                    self.streamParam._transcription_thread.join()
+                    self.streamParam._transcription_thread = None
                 self.streamParam._audio_queue.empty()
                 logger.info(f"set_busy to False, clear _stop_event,done")
 

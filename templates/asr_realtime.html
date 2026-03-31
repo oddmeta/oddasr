@@ -210,6 +210,7 @@
         let audioContext = null;
         let analyser = null;
         let microphone = null;
+        let processor = null;
         let isRecording = false;
         let sessionStartTime = null;
         let audioChunkCount = 0;
@@ -306,18 +307,24 @@
                 
                 initVisualizer();
                 
-                mediaRecorder = new MediaRecorder(stream, {
-                    mimeType: 'audio/webm;codecs=opus'
-                });
+                processor = audioContext.createScriptProcessor(4096, 1, 1);
                 
-                mediaRecorder.ondataavailable = async (event) => {
-                    if (event.data.size > 0 && socket && socket.connected) {
-                        const arrayBuffer = await event.data.arrayBuffer();
-                        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+                processor.onaudioprocess = (event) => {
+                    if (socket && socket.connected && isRecording) {
+                        const inputBuffer = event.inputBuffer;
+                        const channelData = inputBuffer.getChannelData(0);
+                        
+                        const samples = channelData;
+                        const buffer = new Int16Array(samples.length);
+                        for (let i = 0; i < samples.length; i++) {
+                            buffer[i] = Math.max(-1, Math.min(1, samples[i])) * 0x7FFF;
+                        }
+                        
+                        const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer.buffer)));
                         socket.emit('input_audio_buffer.append', { audio: base64 });
                         audioChunkCount++;
                         
-                        if (audioChunkCount % 10 === 0) {
+                        if (audioChunkCount % 20 === 0) {
                             socket.emit('input_audio_buffer.commit', {});
                         }
                         
@@ -325,7 +332,8 @@
                     }
                 };
                 
-                mediaRecorder.start(200);
+                microphone.connect(processor);
+                processor.connect(audioContext.destination);
                 return true;
             } catch (error) {
                 console.error('Error initializing audio:', error);
@@ -423,9 +431,19 @@
                 btnText.textContent = '停止录音';
                 updateStatus('recording', '录音中...');
             } else {
+                if (processor) {
+                    processor.disconnect();
+                    processor = null;
+                }
+                
                 if (mediaRecorder && mediaRecorder.state !== 'inactive') {
                     mediaRecorder.stop();
                     mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                }
+                
+                if (microphone) {
+                    microphone.disconnect();
+                    microphone = null;
                 }
                 
                 if (socket && socket.connected) {
