@@ -119,7 +119,7 @@ def register_handlers(socketio):
         emit('session.created', {'id': session_id})
 
     @socketio.on('disconnect')
-    def handle_disconnect():
+    def handle_disconnect(data=None):
         sid = request.sid
         logger.info(f"Client disconnected from realtime API: {sid}")
         release_stream_for_session(sid)

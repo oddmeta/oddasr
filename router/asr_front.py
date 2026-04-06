@@ -23,6 +23,10 @@ def asr_file():
 def asr_sentence():
     return render_template('asr_sentence.html', servercfg=config.asr)
 
+@bp.route('/asr_sentence_openai.html')
+def asr_sentence_openai():
+    return render_template('asr_sentence_openai.html', servercfg=config.asr)
+
 @bp.route('/asr_realtime.html')
 def asr_realtime():
     return render_template('asr_realtime.html')
@@ -87,7 +91,6 @@ def slp_acoustic_model():
 def slp_textual_substitution():
     data = {}
     return render_template('slp_textual_substitution.html', data=data)
-
 
 @bp.route('/dialectmodal.html')
 @session_required

@@ -18,7 +18,7 @@ DEFAULT_CONFIG = {
         "concurrent_thread": 0,
         "asr_stream_cfg": {
             'max_instance': 1,
-            'save_audio': False,
+            'save_audio': True,
             'punct_mini_len': 10,
             'punct_time_mini_force_trigger': 3,
             'free_resource_timeout': 5,
