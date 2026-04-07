@@ -13,8 +13,8 @@ import asyncio
 from funasr import AutoModel
 import threading
 
-from log import logger
-import proto
+from oddasr.log import logger
+import oddasr.logic.proto as proto
 
 # 创建一个线程安全的优先级队列
 asr_result_queue = queue.SimpleQueue()

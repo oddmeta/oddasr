@@ -9,8 +9,7 @@
 
 import logging
 from logging import handlers
-import platform
-import odd_asr_config as config
+import oddasr.odd_asr_config as config
 
 
 def _logging():

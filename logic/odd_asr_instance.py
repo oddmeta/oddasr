@@ -7,11 +7,11 @@
 @info: ASR实例管理
 """
 
-from log import logger
+from oddasr.log import logger
 
-from odd_asr_file import OddAsrFile, OddAsrParamsFile
-from odd_asr_sentence import OddAsrSentence, OddAsrParamsSentence
-import odd_asr_config as config
+from oddasr.logic.odd_asr_file import OddAsrFile, OddAsrParamsFile
+from oddasr.logic.odd_asr_sentence import OddAsrSentence, OddAsrParamsSentence
+import oddasr.odd_asr_config as config
 
 # File ASR
 odd_asr_params_file = OddAsrParamsFile()

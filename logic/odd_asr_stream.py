@@ -9,18 +9,17 @@
 
 import torch
 import numpy as np
-
 import queue
 import threading
 import time
 import re
 import copy
-
 import os
 from funasr import AutoModel
-from log import logger
-from odd_asr_result import enque_asr_result, OddAsrStreamResult
-import odd_asr_config as config
+
+from oddasr.log import logger
+from oddasr.logic.odd_asr_result import enque_asr_result, OddAsrStreamResult
+import oddasr.odd_asr_config as config
 
 class AudioFrame:
     def __init__(self, data, sr: int = 16000, channel=1, bit_depth=16, timestamp = 0):
@@ -49,11 +48,16 @@ class OddAsrStats:
         self.total_asr_len = 0                      # 转写总长度
         self.total_asr_time = 0                     # 转写总时间
         self.last_recv_timestamp: float = 0.0       # 最后一次接收音频的时间戳
+        self.last_cache_update_timestamp: float = 0.0  # 最后一次缓存更新的时间戳
         self.last_reply_par_timestamp: float = 0.0  # 最后一次回复中间结果的时间戳
         self.last_reply_fin_timestamp: float = 0.0  # 最后一次生成最终结果的时间戳
 
 
 class OddAsrParamsStream:
+    """
+    OddAsrParamsStream
+    """
+    # mode: stream, file, pipeline
     _mode: str = "stream"
     _hotwords: str = "oddmeta xiaoluo"
     _rec_file:str =""
@@ -77,6 +81,14 @@ class OddAsrParamsStream:
     _stats = OddAsrStats()
     task_id = None
 
+    _model_asr_mode: str = "Fun-ASR-Nano-2512"
+    _model_asr_model: str = "paraformer-zh-streaming"
+    _model_asr_revision: str = "v2.0.4"
+    _model_punc_model: str = "iic/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727"
+    _model_punc_mode: str = ""
+    _model_punc_revision: str = "v2.0.4"
+
+
     def __init__(self, 
                  mode="stream", 
                  hotwords="", 
@@ -88,6 +100,7 @@ class OddAsrParamsStream:
                  chunk_size=[0, 10, 5], 
                  encoder_chunk_look_back=4, 
                  decoder_chunk_look_back=1,
+                 combined_index: int = 0,
                  ):
         self._mode = mode  # mode should be a string like 'file','stream', 'pipeline'
         self._hotwords = hotwords  # hotwords should be a string like 'word1 word2'
@@ -136,6 +149,15 @@ class OddAsrParamsStream:
             raise ValueError("chunk_size[1] should be between 0 and 60000, in ms")
         if self._chunk_size[2] < 0 or self._chunk_size[2] > 60000:
             raise ValueError("chunk_size[2] should be between 0 and 60000, in ms")
+
+        self._combined_index = combined_index
+        self._model_asr_model = config.odd_asr_cfg["asr_stream_cfg"]["models"]["combinations"][self._combined_index]["asr"]["model"]
+        self._model_asr_mode = config.odd_asr_cfg["asr_stream_cfg"]["models"]["combinations"][self._combined_index]["asr"]["mode"]
+        self._model_asr_revision = config.odd_asr_cfg["asr_stream_cfg"]["models"]["combinations"][self._combined_index]["asr"]["revision"]
+
+        self._model_punc_model = config.odd_asr_cfg["asr_stream_cfg"]["models"]["combinations"][self._combined_index]["punc"]["model"]
+        self._model_punc_mode = config.odd_asr_cfg["asr_stream_cfg"]["models"]["combinations"][self._combined_index]["punc"]["mode"]
+        self._model_punc_revision = config.odd_asr_cfg["asr_stream_cfg"]["models"]["combinations"][self._combined_index]["punc"]["revision"]
         
     def _default_callback(self, result):
 
@@ -177,8 +199,9 @@ class OddAsrStream:
             if not is_busy:
                 logger.info(f"set_busy to False, clear _stop_event, websocket={self.streamParam._websocket}, task_id={self.streamParam.task_id}")
                 self.streamParam._stop_event.set()
-                self.streamParam._transcription_thread.join()
-                self.streamParam._transcription_thread = None
+                if self.streamParam._transcription_thread:
+                    self.streamParam._transcription_thread.join()
+                    self.streamParam._transcription_thread = None
                 self.streamParam._audio_queue.empty()
                 logger.info(f"set_busy to False, clear _stop_event,done")
 
@@ -206,16 +229,11 @@ class OddAsrStream:
         # load stream model
         if not self.stream_model:
             self.stream_model = AutoModel(
-                model="paraformer-zh-streaming", model_revision="v2.0.4",
+                # model="paraformer-zh-streaming", 
+                # model_revision="v2.0.4",
+                model=self.streamParam._model_asr_model,
+                model_revision=self.streamParam._model_asr_revision,
 
-                # vad_model='iic/speech_fsmn_vad_zh-cn-16k-common-pytorch', vad_model_revision="v2.0.4",
-                # vad_model="fsmn-vad", vad_model_revision="v2.0.4",
-
-                # punc_model='iic/punc_ct-transformer_cn-en-common-vocab471067-large', punc_model_revision="v2.0.4",
-                # punc_model='iic/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727-large', punc_model_revision="v2.0.4",
-                # punc_model='iic/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727', punc_model_revision="v2.0.4",
-
-                # spk_model="cam++",
                 log_level="debug",
                 hub="ms",  # hub：表示模型仓库，ms为选择modelscope下载，hf为选择huggingface下载。
                 device=device,
@@ -245,7 +263,11 @@ class OddAsrStream:
 
             self.punc_model = AutoModel(
                 # model='iic/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727-large', punc_model_revision="v2.0.4",
-                model="iic/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727", model_revision="v2.0.4",
+
+                # model="iic/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727", 
+                # model_revision="v2.0.4",
+                model=self.streamParam._model_punc_model,
+                model_revision=self.streamParam._model_punc_revision,
                 hub="ms",  # hub：表示模型仓库，ms为选择modelscope下载，hf为选择huggingface下载。
                 device=device,
                 disable_update=True,
@@ -306,6 +328,14 @@ class OddAsrStream:
                 if self.streamParam._audio_cache.size > 0:
                     # 直接将numpy数组放入队列（无需转换为bytes）
                     cache_array = (self.streamParam._audio_cache * 32768).astype(np.int16)
+                    
+                    # # 保存EOF前的缓存音频
+                    # if config.odd_asr_cfg["asr_stream_cfg"]["save_audio"]:
+                    #     if self.streamParam._rec_file == "":
+                    #         self.streamParam._rec_file = self._generate_save_file_name(self.streamParam._rec_file, self.streamParam.task_id)
+                    #     logger.info(f"save EOF cache audio to {self.streamParam._rec_file}, len={len(cache_array)}")
+                    #     self._save_audio_rec(self.streamParam._rec_file, cache_array, 16000)
+                    
                     frame = AudioFrame(data=cache_array)
                     self.streamParam._audio_queue.put(frame)
                     self.streamParam._audio_cache = np.array([], dtype=np.float64)  # 清空缓存
@@ -354,7 +384,10 @@ class OddAsrStream:
                     # 数据不足chunk_stride，存入缓存
                     with self.lock:  # 使用锁保护共享资源访问
                         self.streamParam._audio_cache = combined_data.copy()  # 创建数据副本
-
+                
+                # 更新缓存更新时间戳
+                self.streamParam._stats.last_cache_update_timestamp = time.time()
+                
                 self.streamParam._stats.total_audio_recv_len += len(audio_frame)
                 self.streamParam._stats.last_recv_timestamp = time.time()
 
@@ -415,6 +448,8 @@ class OddAsrStream:
             logger.debug(f"No speech detected, skipping...")
 
         logger.info(f"VAD result: {vad_result}")
+        
+        return vad_result
 
 
     def _generate_stream_asr(self, pcm_chunk, is_final = False, cache=None, hotwords=""):
@@ -492,7 +527,23 @@ class OddAsrStream:
         self.streamParam._audio_queue.put(None)
         # self.streamParam._audio_queue.join()
         # self.streamParam._audio_queue.task_done()
+        with self.lock:
+            self.streamParam._audio_cache = np.array([], dtype=np.float64)
         self.streamParam._stats.reset()
+
+    def _generate_save_file_name(self, filename, session_id):
+        '''
+        生成保存文件名，包含: 当时时间字符串、会话ID
+        保存文件名格式: tmp/时间字符串-会话ID.pcm
+
+        filename: 保存文件名
+        session_id: 会话ID
+        return: 保存文件名
+        '''
+        if filename == "":
+            time_str = time.strftime("%Y%m%d%H%M%S", time.localtime())
+            filename = f"tmp/{time_str}-{session_id}.pcm"
+        return filename
 
     def _transcribe_thread_wrapper(self):
         import asyncio
@@ -524,6 +575,27 @@ class OddAsrStream:
                 except queue.Empty:  # sleep 100ms if read timeout
                     time.sleep(0.1)
                     timediff = time.time() - self.streamParam._stats.last_recv_timestamp
+                    
+                    # 检查缓存是否需要刷新（当缓存中有数据但长时间未收到新音频时）
+                    cache_flush_timeout = config.odd_asr_cfg["asr_stream_cfg"].get("cache_flush_timeout", 2)
+                    if self.streamParam._audio_cache.size > 0:
+                        cache_timediff = time.time() - self.streamParam._stats.last_cache_update_timestamp
+                        if cache_timediff > cache_flush_timeout:
+                            logger.info(f"Cache timeout ({cache_flush_timeout}s), flushing remaining audio data: {len(self.streamParam._audio_cache)} samples")
+                            cache_array = (self.streamParam._audio_cache * 32768).astype(np.int16)
+                            
+                            # # 保存刷新的缓存音频
+                            # if config.odd_asr_cfg["asr_stream_cfg"]["save_audio"]:
+                            #     if self.streamParam._rec_file == "":
+                            #         self.streamParam._rec_file = self._generate_save_file_name(self.streamParam._rec_file, self.streamParam.task_id)
+                            #     logger.info(f"save cache flush audio to {self.streamParam._rec_file}, len={len(cache_array)}")
+                            #     self._save_audio_rec(self.streamParam._rec_file, cache_array, 16000)
+                            
+                            frame = AudioFrame(data=cache_array)
+                            self.streamParam._audio_queue.put(frame)
+                            self.streamParam._audio_cache = np.array([], dtype=np.float64)
+                            continue
+                    
                     # 5 seconds without receiving audio, stop the thread
                     if timediff > self.streamParam._free_resource_timeout:
                         logger.warn(f"No audio received for {self.streamParam._free_resource_timeout} seconds, stopping transcription thread.")
@@ -539,8 +611,8 @@ class OddAsrStream:
                 # STEP 2. save the pcm to a record file
                 if config.odd_asr_cfg["asr_stream_cfg"]["save_audio"]:
                     if self.streamParam._rec_file == "":
-                        self.streamParam._rec_file = "tmp/" + self.streamParam.task_id + ".pcm"
-                    logger.debug(f"save audio frame to {self.streamParam._rec_file}, sr={frame.sr}, len={len(frame.data)}")
+                        self.streamParam._rec_file = self._generate_save_file_name(self.streamParam._rec_file, self.streamParam.task_id)
+                    logger.info(f"save audio frame to {self.streamParam._rec_file}, sr={frame.sr}, len={len(frame.data)}")
                     self._save_audio_rec(self.streamParam._rec_file, frame.data, frame.sr)
 
                 speech = frame.data.copy()  # 创建数据副本
@@ -549,7 +621,8 @@ class OddAsrStream:
                 # STEP 3. Spit the audio to chunks, each chunk should match the chunk_size initialized in streamParam 
                 chunk_stride = self.streamParam._chunk_size[1] * 960 # 600ms
                 total_chunk_num = int(len(speech)/chunk_stride)
-                # logger.info(f"Processing frame, stride: {chunk_stride}, data={len(speech)}, total_chunk_num={total_chunk_num}, is_final={is_final}")
+                remainder = len(speech) - total_chunk_num * chunk_stride
+                # logger.info(f"Processing frame, stride: {chunk_stride}, data={len(speech)}, total_chunk_num={total_chunk_num}, remainder={remainder}, is_final={is_final}")
 
                 # 在_transcribe_thread_wrapper方法中，添加对音频块的有效性检查
                 for i in range(total_chunk_num):
@@ -570,7 +643,7 @@ class OddAsrStream:
                     ## STEP 3.1 VAD
                     vad_result = self._generate_vad_data(audio_chunk)
                     if vad_result and not vad_result.is_speech:
-                        logger.debug(f"No speech detected in chunk {i}, skipping...")
+                        logger.warning(f"No speech detected in chunk {i}, skipping...")
                         continue
 
                     # STEP 4. Transcribe the audio chunk
@@ -633,6 +706,14 @@ class OddAsrStream:
 
                     else:
                         self.streamParam._text_cache = remain_text
+
+                # 处理剩余的音频数据（不足一个chunk_stride的部分）
+                if remainder > 0 and not is_final:
+                    remainder_audio = speech[total_chunk_num * chunk_stride:].copy()
+                    with self.lock:
+                        self.streamParam._audio_cache = np.concatenate([self.streamParam._audio_cache, remainder_audio])
+                    self.streamParam._stats.last_cache_update_timestamp = time.time()
+                    logger.info(f"Reserved remainder audio: {len(remainder_audio)} samples")
 
                 time.sleep(0.1)
 

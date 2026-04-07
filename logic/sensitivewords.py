@@ -8,9 +8,9 @@
 """
 from json import dumps
 
-from log import logger
-from model import db
-from model import sensitiveword as sw
+from oddasr.log import logger
+from oddasr.model import db
+from oddasr.model import sensitiveword as sw
 
 class SensitiveWordManage(object):
     """

@@ -31,7 +31,7 @@ RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://
 RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # expose port
-EXPOSE 12340 12341
+EXPOSE 8101 9002
 
 # set start command
 CMD ["python", "main_server.py"]

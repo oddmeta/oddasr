@@ -1,6 +1,7 @@
 from email.policy import default
 from sqlalchemy import Column, Integer, String, Text
-from model.db import Base
+
+from oddasr.model.db import Base
 
 class CText(Base):
     __tablename__ = 'oddasr_text'

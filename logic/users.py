@@ -1,6 +1,7 @@
-import odd_asr_config as config;
-import io;
-import json;
+import oddasr.odd_asr_config as config
+
+import io
+import json
 
 g_data = {'user':'Admin','pwd':'Odd_Asr'}
 

@@ -73,7 +73,7 @@
       <div class="col-sm-6">
         <ol class="breadcrumb float-sm-right">
           <li class="breadcrumb-item active">一句话识别</li>
-          <li class="breadcrumb-item"><a href="asr_live.html">实时识别</a></li>
+          <li class="breadcrumb-item"><a href="asr_realtime.html">实时识别</a></li>
           <li class="breadcrumb-item"><a href="asr_file.html">文件识别</a></li>
         </ol>
       </div>
@@ -267,7 +267,7 @@
           const formData = new FormData();
           formData.append("audio", wavBlob, 'recording.wav');
           formData.append("mode", "file"); // 设置模式为file
-          formData.append("output_format", "txt"); // 设置输出格式为纯文本
+          formData.append("output_format", "text"); // 设置输出格式为纯文本
           
           // 检测是否启用热词
           if ($('input[name="enableHotword"]:checked').val() == 'on') {

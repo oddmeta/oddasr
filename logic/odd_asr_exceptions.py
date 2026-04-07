@@ -8,7 +8,8 @@
 """
 
 from flask import jsonify
-import odd_asr_result
+
+from oddasr.logic import odd_asr_result
 
 # 以下是c++的错误的PYTHON实现.
 

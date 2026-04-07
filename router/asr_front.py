@@ -1,15 +1,13 @@
-import time
-import wave
 import json
 
 from flask import Blueprint, render_template, request, session, redirect, send_from_directory, send_file
 from werkzeug.utils import secure_filename
-from mutagen.mp3 import MP3
 
-import odd_asr_config as config
-from log import logger
-from router.oddasr_session import session_required
-from logic import hotwords, sensitivewords, users
+import oddasr.odd_asr_config as config
+from oddasr.log import logger
+
+from oddasr.router.oddasr_session import session_required
+from oddasr.logic import hotwords, sensitivewords, users
 
 bp = Blueprint('front_asr', __name__, url_prefix='')
 
@@ -24,6 +22,14 @@ def asr_file():
 @bp.route('/asr_sentence.html')
 def asr_sentence():
     return render_template('asr_sentence.html', servercfg=config.asr)
+
+@bp.route('/asr_sentence_openai.html')
+def asr_sentence_openai():
+    return render_template('asr_sentence_openai.html', servercfg=config.asr)
+
+@bp.route('/asr_realtime.html')
+def asr_realtime():
+    return render_template('asr_realtime.html')
 
 @bp.route('/login', methods=['POST'])
 def login():
@@ -85,7 +91,6 @@ def slp_acoustic_model():
 def slp_textual_substitution():
     data = {}
     return render_template('slp_textual_substitution.html', data=data)
-
 
 @bp.route('/dialectmodal.html')
 @session_required

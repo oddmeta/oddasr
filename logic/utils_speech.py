@@ -146,6 +146,21 @@ def text_to_srt(idx, speaker_id, msg, start_microseconds, end_microseconds) -> s
     )
     return srt
 
+def text_to_vtt(idx, speaker_id, msg, start_microseconds, end_microseconds):
+    start_time = convert_time_to_srt_format(start_microseconds)
+    end_time = convert_time_to_srt_format(end_microseconds)
+    start_time = start_time.replace(",", ".")
+    end_time = end_time.replace(",", ".")
+
+    msg = f"{msg}"
+    vtt_text = """%d %s --> %s %s """ % (
+        idx,
+        start_time,
+        end_time,
+        msg,
+    )
+
+    return vtt_text
 
 if __name__ == '__main__':
 

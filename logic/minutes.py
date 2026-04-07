@@ -1,9 +1,9 @@
 from sqlalchemy import or_, desc, func
 
-from log import logger
-from model.db import Session
-from model.meeting import CMeeting, CMeetingStatus2
-from model.text import CText
+from oddasr.log import logger
+from oddasr.model.db import Session
+from oddasr.model.meeting import CMeeting, CMeetingStatus2
+from oddasr.model.text import CText
 
 # apply res suc.
 class CStorageMinutes:

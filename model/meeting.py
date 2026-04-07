@@ -1,6 +1,5 @@
-from email.policy import default
 from sqlalchemy import Column, Integer, String
-from model.db import Base
+from oddasr.model.db import Base
 from enum import Enum
 
 class CMeetingStatus(str, Enum):
@@ -11,19 +10,12 @@ class CMeetingStatus(str, Enum):
     MEETING_STATUS_ERROR = 3
 
     def __int__(self):
-        match self.value:
-            case -1:
-                return "MEETING_STATUS_APPLY"
-            case 0:
-                return "MEETING_STATUS_MINUTES"
-            case 1:
-                return "MEETING_STATUS_ENCODE"
-            case 2:
-                return "MEETING_STATUS_FINISH"
-            case 3:
-                return "MEETING_STATUS_ERROR"
-            case _:
-                return "MEETING_STATUS_INIT"
+        if self.value == -1: return "MEETING_STATUS_APPLY"
+        elif self.value == 0: return "MEETING_STATUS_MINUTES"
+        elif self.value == 1: return "MEETING_STATUS_ENCODE"
+        elif self.value == 2: return "MEETING_STATUS_FINISH"
+        elif self.value == 3: return "MEETING_STATUS_ERROR"
+        else: return "MEETING_STATUS_INIT"
 
 class CMeetingStatus2(str, Enum):
     MEETING_OPEN_STATUS_INIT = 0
@@ -32,17 +24,11 @@ class CMeetingStatus2(str, Enum):
     MEETING_OPEN_STATUS_EXCEPTION = 3
 
     def __int__(self):
-        match self.value:
-            case 0:
-                return "MEETING_OPEN_STATUS_INIT"
-            case 1:
-                return "MEETING_OPEN_STATUS_ENCODE"
-            case 2:
-                return "MEETING_OPEN_STATUS_FINISH"
-            case 3:
-                return "MEETING_OPEN_STATUS_EXCEPTION"
-            case _:
-                return "MEETING_OPEN_STATUS_INIT"
+        if self.value == -1: return "MEETING_OPEN_STATUS_INIT"
+        elif self.value == 1: return "MEETING_OPEN_STATUS_ENCODE"
+        elif self.value == 2: return "MEETING_OPEN_STATUS_FINISH"
+        elif self.value == 3: return "MEETING_OPEN_STATUS_EXCEPTION"
+        else: return "MEETING_OPEN_STATUS_INIT"
 
 class CMeeting(Base):
     __tablename__ = 'oddasr_meeting'
