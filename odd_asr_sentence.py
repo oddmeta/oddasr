@@ -8,6 +8,7 @@
 """
 
 import torch
+import numpy as np
 import librosa
 import torchaudio
 
@@ -72,7 +73,8 @@ class OddAsrSentence:
             vad_model='iic/speech_fsmn_vad_zh-cn-16k-common-pytorch', vad_model_revision="v2.0.4",
             # punc_model='ct-punc',
             punc_model='iic/punc_ct-transformer_cn-en-common-vocab471067-large', punc_model_revision="v2.0.4",
-            spk_model="cam++",
+            # spk_model 仅 spk/srt 输出需要，txt 模式跳过以省去 speaker embedding 推理开销
+            # spk_model="cam++",
             # spk_model="iic/speech_campplus_sv_zh-cn_16k-common", spk_model_revision="v2.0.4", # 下载模型失败
             # spk_model="iic/speech_campplus_sv_zh-cn_3dspeaker_16k",
             log_level="error",
@@ -104,12 +106,15 @@ class OddAsrSentence:
                 logger.info(f"Loading audio file: {audio_file}")
                 data, sr = librosa.load(audio_file, sr=None, mono=True)
                 logger.info(f"Audio loaded successfully. Sample rate: {sr}, data shape: {data.shape}")
+
+                # 跳过 float32 的无效 float64 转换（librosa 已返回 float32）
+                if data.dtype != np.float32:
+                    data = convert_pcm_to_float(data)
+                    data = data.astype(np.float32)
                 
                 # Check if data is valid
                 if len(data) == 0:
                     raise ValueError("Loaded audio data is empty")
-                    
-                data = convert_pcm_to_float(data)
             except Exception as e:
                 logger.error(f"Failed to load audio file: {e}")
                 self.set_busy(False)

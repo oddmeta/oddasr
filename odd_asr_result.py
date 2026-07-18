@@ -20,6 +20,14 @@ import proto
 asr_result_queue = queue.SimpleQueue()
 asr_result_queue_lock = threading.Lock()
 
+# OpenAI 连接结果处理回调，由 odd_wss_server 设置
+_openai_result_callback = None
+
+def set_openai_result_callback(callback):
+    """设置 OpenAI 结果处理回调函数"""
+    global _openai_result_callback
+    _openai_result_callback = callback
+
 class Result:
     def __init__(self):
         self._result = {}
@@ -88,6 +96,15 @@ async def notify_task(_wss_server=None):
                 # print(f"notifyTask: {message.text}")
 
                 if _wss_server:
+                    # 检查 OpenAI 回调是否处理了该结果
+                    if _openai_result_callback:
+                        try:
+                            handled = await _openai_result_callback(message, _wss_server)
+                            if handled:
+                                continue
+                        except Exception as e:
+                            logger.error(f"OpenAI callback error: {e}")
+
                     if message.webocket in _wss_server._clients_set:
                         # 发送消息给客户端
                         # print(f"notifyTask: send to client={message.webocket}")

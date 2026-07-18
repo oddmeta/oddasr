@@ -16,7 +16,7 @@ from mutagen.mp3 import MP3
 
 # import app
 from log import logger
-from odd_asr_instance import find_free_odd_asr_file, find_free_odd_asr_sentence
+from odd_asr_instance import find_free_odd_asr_file, find_free_odd_asr_sentence, release_odd_asr_sentence
 from scheduled_task import ScheduledTask
 from odd_asr_file import OddAsrFile
 from odd_asr_sentence import OddAsrSentence
@@ -81,6 +81,7 @@ def transcribe_sentence():
             result = f"ASR processing error: {str(e)}"
             return_ok = False
         finally:
+            release_odd_asr_sentence(odd_asr_sentence)
             # Delete the temporary file
             if os.path.exists(temp_path):
                 try:

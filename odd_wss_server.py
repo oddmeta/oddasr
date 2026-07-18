@@ -17,9 +17,15 @@ import websockets
 import ssl
 import uuid
 import queue
+import base64
+from urllib.parse import urlparse, parse_qs
+
+import torch
+import torchaudio
 
 from odd_asr_stream import OddAsrStream, OddAsrParamsStream
-from odd_asr_result import notifyTask
+from odd_asr_result import notifyTask, set_openai_result_callback
+from odd_asr_instance import InstancePool
 import odd_asr_config as config
 from log import logger
 from odd_asr_exceptions import *
@@ -35,24 +41,114 @@ server --> client: ASRResult
 '''
 
 
-odd_asr_stream_set = set()
+odd_asr_stream_pool = InstancePool()
 _wss_server = None
+
+# ============================================================
+# OpenAI 兼容实时转录相关
+# ============================================================
+
+# OpenAI 连接追踪：websocket -> session info dict
+openai_connections = {}
+
+def _build_ulaw_decode_table():
+    """构建 G.711 u-law 解码查找表（Sun Microsystems 算法）"""
+    table = []
+    for i in range(256):
+        ulaw = ~i & 0xFF
+        t = ((ulaw & 0x0F) << 3) + 0x84
+        t <<= (ulaw & 0x70) >> 4
+        if ulaw & 0x80:
+            table.append(0x84 - t)
+        else:
+            table.append(t - 0x84)
+    return table
+
+_ULAW_TABLE_NP = np.array(_build_ulaw_decode_table(), dtype=np.int16)
+
+
+def _validate_openai_token(websocket):
+    """从 websocket 请求中提取并验证 Bearer Token"""
+    api_key = config.openai_api_key
+    if not api_key:
+        return True  # 空 key 表示不鉴权
+
+    token = None
+
+    # 从 Authorization header 提取
+    if hasattr(websocket, 'request') and hasattr(websocket.request, 'headers'):
+        auth_header = websocket.request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            token = auth_header[7:]
+
+    # 从 query 参数提取
+    if not token and hasattr(websocket, 'request'):
+        parsed = urlparse(websocket.request.path)
+        params = parse_qs(parsed.query)
+        token = params.get('token', [None])[0] or params.get('api_key', [None])[0]
+
+    if not token:
+        return False
+
+    if isinstance(api_key, str):
+        return token == api_key
+    elif isinstance(api_key, list):
+        return token in api_key
+    return False
+
+
+async def _openai_result_handler(message, wss_server):
+    """处理 OpenAI 连接的转录结果，返回 True 表示已处理"""
+    ws = message.webocket
+    if ws not in openai_connections:
+        return False
+
+    info = openai_connections[ws]
+    text = message.res.payload.result
+    is_final = message.res.header.name == "SentenceEnd"
+    is_last = message.res.payload.fin == 1
+
+    # 转写结束信号
+    if is_last and text == "END":
+        return True
+
+    # 连接已关闭，丢弃结果
+    if text is None:
+        return True
+
+    event_id = f"evt_{uuid.uuid1().hex[:24]}"
+
+    if is_final:
+        event = {
+            "type": "conversation.item.input_audio_transcription.completed",
+            "event_id": event_id,
+            "item_id": info["session_id"],
+            "transcript": text,
+        }
+    else:
+        event = {
+            "type": "conversation.item.input_audio_transcription.delta",
+            "event_id": event_id,
+            "item_id": info["session_id"],
+            "delta": text,
+        }
+
+    await wss_server.doSend(ws, json.dumps(event))
+    return True
 
 def find_free_odd_asr_stream(websocket, task_id):
     '''
-    找到一个空闲的odd_asr_stream
+    从实例池获取一个空闲的odd_asr_stream
     :param websocket:
+    :param task_id:
     :return:
     '''
-    for odd_asr_stream in odd_asr_stream_set:
-        if not odd_asr_stream.is_busy():
-            odd_asr_stream.set_busy(True)
-            odd_asr_stream.set_session_id(task_id)
-            odd_asr_stream.set_websocket(websocket)
-
-            return odd_asr_stream
-        
-    return None
+    stream = odd_asr_stream_pool.acquire()
+    if stream:
+        stream.set_busy(True)
+        stream.set_session_id(task_id)
+        stream.set_websocket(websocket)
+    return stream
 
 def find_odd_asr_stream_by_websocket(websocket):
     '''
@@ -60,21 +156,20 @@ def find_odd_asr_stream_by_websocket(websocket):
     :param websocket:
     :return:
     '''
-    for odd_asr_stream in odd_asr_stream_set:
-        if odd_asr_stream.get_websocket() == websocket:
-            return odd_asr_stream
-        
-    return None
+    return odd_asr_stream_pool.find_by_websocket(
+        lambda s: s.get_websocket(), websocket
+    )
 
 def free_odd_asr_stream(odd_asr_stream):
     '''
-    释放一个odd_asr_stream
+    释放一个odd_asr_stream回实例池
     :param odd_asr_stream:
     :return:
     '''
     odd_asr_stream.set_busy(False)
     odd_asr_stream.set_session_id(None)
     odd_asr_stream.set_websocket(None)
+    odd_asr_stream_pool.release(odd_asr_stream)
 
 def find_odd_asr_stream_by_session_id(task_id):
     '''
@@ -82,10 +177,9 @@ def find_odd_asr_stream_by_session_id(task_id):
     :param task_id:
     :return:
     '''
-    for odd_asr_stream in odd_asr_stream_set:
-        if odd_asr_stream.get_session_id() == task_id:
-            return odd_asr_stream
-    return None
+    return odd_asr_stream_pool.find_by_session_id(
+        lambda s: s.get_session_id(), task_id
+    )
 
 class OddWssServer:
     def __init__(self):
@@ -98,6 +192,21 @@ class OddWssServer:
         # 从参数中提取 websocket 和 path
         websocket = args[0]
         logger.debug(f"Client connected: {websocket}, args={args}, len={len(args)}, kwargs={kwargs}")
+
+        # 检查是否为 OpenAI 实时转录路径
+        path = '/'
+        if hasattr(websocket, 'request') and hasattr(websocket.request, 'path'):
+            path = websocket.request.path
+
+        parsed = urlparse(path)
+        if parsed.path == '/v1/realtime':
+            params = parse_qs(parsed.query)
+            intent = params.get('intent', [''])[0]
+            if intent != 'transcription':
+                await websocket.close(code=4003, reason='Invalid intent')
+                return
+            await self.handle_openai_realtime(websocket)
+            return
         
         try:
             async for message in websocket:
@@ -156,6 +265,139 @@ class OddWssServer:
         finally:
             self.onClose(websocket)
 
+    async def handle_openai_realtime(self, websocket):
+        """处理 OpenAI 实时转录 WebSocket 连接"""
+        # 验证认证
+        if not _validate_openai_token(websocket):
+            await websocket.close(code=4001, reason='Invalid authentication')
+            return
+
+        session_id = str(uuid.uuid1())
+
+        # 查找空闲的 stream 实例
+        stream = find_free_odd_asr_stream(websocket, session_id)
+        if stream is None:
+            logger.error("no free odd_asr_stream for OpenAI client")
+            await websocket.close(code=4002, reason='No available ASR instance')
+            return
+
+        # 创建 OpenAI 会话信息
+        resampler = torchaudio.transforms.Resample(8000, 16000)
+        openai_connections[websocket] = {
+            "session_id": session_id,
+            "stream": stream,
+            "resampler": resampler,
+        }
+
+        # 注册到服务器客户端集合
+        self._clients_set.add(websocket)
+        self._conn_sessionid[websocket] = session_id
+        self._sessionid_conn[session_id] = websocket
+        self._sessionid_set.add(session_id)
+
+        try:
+            # 发送 transcription_session.created
+            await self._send_openai_event(websocket, {
+                "type": "transcription_session.created",
+                "session": {
+                    "id": session_id,
+                    "input_audio_format": "g711_ulaw",
+                    "input_audio_sample_rate": 8000,
+                }
+            })
+
+            # 消息循环
+            async for message in websocket:
+                if isinstance(message, bytes):
+                    continue  # OpenAI 使用 JSON 事件，忽略裸 bytes
+
+                try:
+                    event = json.loads(message)
+                    event_type = event.get('type', '')
+
+                    match event_type:
+                        case 'transcription_session.update':
+                            await self._handle_openai_session_update(websocket, event)
+                        case 'input_audio_buffer.append':
+                            await self._handle_openai_audio_append(websocket, event)
+                        case 'input_audio_buffer.commit':
+                            await self._handle_openai_audio_commit(websocket)
+                        case 'input_audio_buffer.clear':
+                            pass  # 暂不实现
+                        case _:
+                            logger.warning(f"Unknown OpenAI event: {event_type}")
+
+                except json.JSONDecodeError:
+                    logger.error("Invalid JSON from OpenAI client")
+
+        except websockets.exceptions.ConnectionClosed:
+            logger.info(f"OpenAI client disconnected: {session_id}")
+        finally:
+            # 清理 OpenAI 连接
+            if websocket in openai_connections:
+                del openai_connections[websocket]
+            free_odd_asr_stream(stream)
+            self.onClose(websocket)
+
+    async def _send_openai_event(self, websocket, event):
+        """发送 OpenAI 格式事件"""
+        if 'event_id' not in event:
+            event['event_id'] = f"evt_{uuid.uuid1().hex[:24]}"
+        await websocket.send(json.dumps(event))
+
+    async def _handle_openai_session_update(self, websocket, event):
+        """处理 transcription_session.update 事件"""
+        info = openai_connections.get(websocket)
+        if not info:
+            return
+
+        await self._send_openai_event(websocket, {
+            "type": "transcription_session.updated",
+            "session": {
+                "id": info["session_id"],
+                "input_audio_format": "g711_ulaw",
+                "input_audio_sample_rate": 8000,
+            }
+        })
+
+    async def _handle_openai_audio_append(self, websocket, event):
+        """处理 input_audio_buffer.append 事件"""
+        info = openai_connections.get(websocket)
+        if not info:
+            return
+
+        audio_base64 = event.get('audio', '')
+        if not audio_base64:
+            return
+
+        try:
+            # base64 解码 → u-law → PCM16 → 重采样 8kHz→16kHz
+            ulaw_bytes = base64.b64decode(audio_base64)
+            pcm16 = _ULAW_TABLE_NP[np.frombuffer(ulaw_bytes, dtype=np.uint8)]
+
+            pcm_tensor = torch.tensor(pcm16, dtype=torch.float32).unsqueeze(0)
+            resampled = info["resampler"](pcm_tensor).squeeze(0)
+            pcm_resampled = resampled.numpy().astype(np.int16)
+
+            # 送入流式 ASR
+            info["stream"].transcribe_stream(
+                pcm_resampled.tobytes(),
+                socket=websocket,
+                task_id=info["session_id"]
+            )
+
+        except Exception as e:
+            logger.error(f"Error processing OpenAI audio: {e}")
+
+    async def _handle_openai_audio_commit(self, websocket):
+        """处理 input_audio_buffer.commit 事件"""
+        info = openai_connections.get(websocket)
+        if info and info["stream"]:
+            # 发送 EOF 触发最终结果
+            info["stream"].transcribe_stream(
+                None, socket=websocket, task_id=info["session_id"]
+            )
+
     async def doSend(self, websocket, message):
         '''
         发送消息给客户端
@@ -213,9 +455,7 @@ class OddWssServer:
             # logger.warn(f"remove task_id={task_id}, client={websocket}, odd_asr_stream={odd_asr_stream}")
 
             if odd_asr_stream:
-                odd_asr_stream.set_websocket(None)
-                odd_asr_stream.set_busy(False)
-                # odd_asr_stream.set_session_id('')
+                free_odd_asr_stream(odd_asr_stream)
 
             logger.warn(f"remove task_id={task_id}, client={websocket}")
         else:
@@ -401,12 +641,11 @@ def init_instances_stream(server: OddWssServer):
     for i in range(max_instance):
         odd_asr_stream_param: OddAsrParamsStream = OddAsrParamsStream(
             mode="stream",
-            hotwords="", 
+            hotwords="",
             audio_rec_filename="",
-            # result_callback=server.doSend,
         )
         odd_asr_stream = OddAsrStream(odd_asr_stream_param)
-        odd_asr_stream_set.add(odd_asr_stream)
+        odd_asr_stream_pool.add(odd_asr_stream)
 
 def init_notify_task(server: OddWssServer):
     '''
@@ -421,6 +660,9 @@ def init_notify_task(server: OddWssServer):
 async def start_wss_server():
     global _wss_server
     _wss_server = OddWssServer()
+
+    # 注册 OpenAI 结果处理回调
+    set_openai_result_callback(_openai_result_handler)
 
     init_notify_task(_wss_server)
     init_instances_stream(_wss_server)
