@@ -1,318 +1,497 @@
-[TOC]
+# OddASR - 兼容 OpenAI API 的语音识别服务器
 
-Here’s a draft for the `README.md` file based on your project:
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.12.0+](https://img.shields.io/badge/python-3.12.0.+-blue.svg)](https://www.python.org/downloads/)
 
----
+OddASR 是一个兼容 OpenAI API 的自动语音识别（ASR）服务器，支持离线转录和流式转录，采用 2-pass ASR 策略以提高准确性。
 
-# OddASR: A Simple ASR API Server for FunASR
+> 注意：
+> - 首次运行时，会自动下载模型文件。模型文件会保存在 `models/` 目录下。
+> - 模型文件大小较大，建议在有足够磁盘空间的环境运行。
+> - 国内用户建议使用镜像加速下载模型文件。
+>   - Windows: set HF_ENDPOINT=https://hf-mirror.com
+>   - Linux/MacOS: export HF_ENDPOINT=https://hf-mirror.com
+> - 本项目基于 Paraformer、Moonshine、SenseVoice、Qwen3-ASR 模型实现，若需要使用其他模型，请自行在配置文件中指定模型路径。
 
-![GitHub](https://img.shields.io/github/license/oddmeta/oddasr)
+## 功能特性
 
-A simplest ASR API server for FunASR based on Flask, supporting both audio file mode and streaming mode transcriptions.
+- ✅ **OpenAI API 兼容**：可作为 OpenAI Whisper API 的替代方案（**中文准确率比 Whisper 高，英文准确率也比 Whisper 高，但英文延迟会高一些**）
+- ✅ **多种响应格式**：支持 text、srt、vtt、json、verbose_json、diarized_json、spk。除spk是OddASR自定义格式，其他格式与 OpenAI API 兼容
+- ✅ **实时流式识别**：支持 WebSocket 实时音频处理，集成 VAD 语音活动检测
+- ✅ **文件流式识别**：网页端可选择本地音频文件，通过 WebSocket 以流式方式逐块发送并实时显示转写结果
+- ✅ **离线处理**：支持批量音频文件转录，支持自定义模型和后端（最大支持的离线识别的音频文件大小从16M提升到50M）
+- ✅ **语音活动检测**：采用 Silero VAD 实现智能语音检测
+- ✅ **2-pass ASR**：结合流式和离线模型，兼顾低延迟和高准确率
+- ✅ **多后端支持**：支持 Paraformer、SenseVoice (sherpa-onnx)、SenseVoice FunASR、Moonshine ASR、Qwen3-ASR 模型，支持自定义模型和后端
+- ✅ **说话人识别**：支持说话人分离（Speaker Diarization），可指定说话人数量、上限、合并阈值与分离粒度，Paraformer 与 Qwen3-ASR 后端可用（详见 [说话人分离配置](docs/oddasr-speaker-diarization-config.md)）
+- ✅ **Web 界面**：提供企业蓝主题网页 Demo，支持麦克风录音、文件流式、离线上传三种识别方式，支持音频播放预览
+- ✅ **模型动态切换**：通过 `model` 参数（如 `oddasr2_qwen3-asr-0.6b`）在请求中指定后端模型，HTTP 和 WebSocket 均支持，无需重启服务
+- ✅ **GPU 自动回退**：配置 `device=cuda` 时，若 CUDA 不可用自动回退到 CPU 并输出 warning，避免服务启动失败
 
-## Introduction
+## 快速开始
 
-**[FunASR](https://github.com/modelscope/FunASR)** is a powerful open-source speech recognition (ASR) library developed by ModelScope.
-It provides a wide range of pre-trained models and tools for various speech recognition tasks.
-This repository aims to simplify the deployment of FunASR for non-realtime audio processing which is my another project ([小落同学](https://x.oddmeta.com)) needed.
+### 安装
 
-## Why OddASR?
-
-- **Simplified Deployment**: Easy-to-use REST API for ASR transcription.
-- **Local Reference**: A standalone Python implementation for local ASR transcription.
-- **Docker Support**: Dockerfiles for both GPU and CPU deployment.
-- **Easy to Use**: Simple API requests for audio file transcription.
-
-## Installation
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/oddmeta/oddasr.git
-   cd oddasr
-   ```
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-## Usage
-
-### 1. Configurations for OddAsr server
-
-You can configure the server by editting `odd_asr_config.py`, here are some important parameters:
-
-- `PORT`: The port number for the file ASR server.
-- `WS_PORT`: The port number for the stream ASR server.
-- `concurrent_thread`: The number of concurrent threads for the server.
-- `disable_stream`: Set to `True` to disable the stream ASR server.
-
-more configurations can be found in `odd_asr_config.py`
-
-### 2. Run the REST API Server
-
-To start the REST API server:
+直接安装：
 
 ```bash
-python main_server.py
+pip install oddasr
 ```
 
-The OddASR server will start **both file mode and stream mode** in default configuration.
-
-If the memory usage of your running environment is critical, you can disable stream mode by editting `odd_asr_config.py` and set `disable_stream = True`
-
-The file ASR server will start on `http://127.0.0.1:12340`, and the stream ASR server will start on `http://127.0.0.1:12341`.
-
-### 3. Recommended hardware
-
-- CPU: 4 cores or more is recommended.
-- Storage: OddAsr docker image(oddasr-cpu:v0.1.0) size is about 2.4GB, and you need about 6GB spaces for the ASR models, and 500M spaces for the logs.
-- Memory: 8GB or more is recommended.
-
-### 4. Test file ASR API
-
-Use the `testAPI.py` script to test the API:
-```bash
-python testAPI.py test_en_steve_jobs_10s.wav txt
-```
-
-Example `curl` command:
-
-- Send an audio file to the REST API
+或者从源码编译：
 
 ```bash
-curl -X POST -F "audio=@path/to/audio.wav" http://127.0.0.1:12340/v1/asr
+# 克隆仓库
+git clone https://github.com/oddmeta/oddasr.git
+cd oddasr
+
+# 安装依赖
+pip install -r requirements.txt
+pip install -e .
 ```
 
-Example `curl` command for testing the `test_cn_male_9s.wav` audio file:
+### 配置（可选）
+
+服务启动时无需配置文件，使用内置 `DEFAULT_CONFIG`。如需自定义，在项目根目录创建 `config.json`，只需覆盖需要修改的项即可：
+
+```
+{
+  "active_model_index": 0,
+  "model_options": [
+    {
+      "model_type": "paraformer-zh",
+      "display_name": "FunASR (Paraformer)",
+      "output_type": ["text", "srt", "vtt", "json", "verbose_json", "spk"],
+      "options": {
+        "streaming": {
+          "model": "paraformer-zh-streaming",
+          "revision": "v2.0.4",
+          "device": "cpu",
+          "max_instance": 1
+        },
+        "offline": {
+          "model": "paraformer-zh",
+          "revision": "v2.0.4",
+          "device": "cpu",
+          "max_instance": 1
+        },
+        "punc": {
+          "model": "iic/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727",
+          "revision": "v2.0.4"
+        },
+        "spk": {
+          "model": "iic/speech_campplus_sv_zh-cn_16k-common",
+          "enable": false,
+          "preset_spk_num": 0,
+          "max_num_spks": 15,
+          "merge_thr": 0.78,
+          "spk_mode": "punc_segment"
+        }
+      }
+    },
+    {
+      "model_type": "sensevoice-onnx",
+      "display_name": "SenseVoice",
+      "output_type": ["text"],
+      "options": {
+        "streaming": {
+          "model": "models/oddasr_model/model/model.int8.onnx",
+          "device": "cpu",
+          "max_instance": 1
+        },
+        "offline": {
+          "model": "models/oddasr_model/model/model.int8.onnx",
+          "device": "cpu",
+          "max_instance": 1
+        }
+      }
+    },
+    {
+      "model_type": "sensevoice-small",
+      "display_name": "SenseVoice FunASR",
+      "output_type": ["text"],
+      "options": {
+        "streaming": {
+          "model": "iic/SenseVoiceSmall",
+          "revision": "master",
+          "device": "cpu",
+          "max_instance": 1
+        },
+        "offline": {
+          "model": "iic/SenseVoiceSmall",
+          "revision": "master",
+          "device": "cpu",
+          "max_instance": 1
+        }
+      }
+    }
+  ],
+  "vad": {
+    "vad_use_model": true,
+    "vad_model_name": "silero-vad",
+    "vad_model_threshold": 0.5,
+    "vad_device": "cpu",
+    "vad_silence_duration": 1.0
+  },
+  "2pass": {
+    "max_audio_samples": 80000
+  }
+}
+```
+
+详见 [配置](#配置) 部分。
+
+### 基本用法
+
+启动服务器：
 
 ```bash
-curl -X POST -F "audio=@test_cn_male_9s.wav" http://127.0.0.1:12340/v1/asr
+oddasr-server
 ```
 
-there are two test audio files in the repo:
-
-- `test_cn_male9s.wav`
-- `test_en_steve_jobs_10s.wav`
-
-you can test them by:
-```bash
-curl -X POST -F "audio=@test_cn_male_9s.wav" http://127.0.0.1:12340/v1/asr
-curl -X POST -F "audio=@test_en_steve_jobs_10s.wav" http://127.0.0.1:12340/v1/asr
-```
-
-### 5. Test stream ASR API
-Use the `testStreamAPI.py` script to test the API, supports pcm and wav file as test input.
-
-- **Limitations**
-
-<font color=red>OddAsr streaming mode current supports only <b>16K sample rate, 16 bit width, mono</b> audio as input.</font>
-
-You need assure your input audio format before feeding them to OddAsr, otherwise the transcription result would not be the one you expected. You can refer to testStreamAPI.py as a demostration for the implementation of your own application.
-
-- Input a pcm file as test input
-```bash
-python testStreamAPI.py 111.pcm
-```
-
-- Input a wav file as test input
+或使用自定义配置：
 
 ```bash
-python testStreamAPI.py test_cn_16k-16bits-mono.wav
-```
-If your test input is a wav file, `testStreamAPI.py` will check sample rate and channel number, if not match, will raise error.
-
-```bash
-python testStreamAPI.py test_cn_16k-16bits-mono.wav --concurrency 4
-```
-Simulate 4 real-time streaming requests to the server.
-
-
-### 6. Example output
-
-- text mode
-
-```bash
-是开始这个呃实时的一个转写。
-对， 然后是转写的一个效果， 大概大概就是这个样子。 
-然后的话那个在这里边你也可以去给他那个加一个人。 
-比如说是嗯我随便给他取一个名字， 
-就是连云端的还是自己算的连云端的吧。 
+oddasr-server --config config.json
 ```
 
-- spk mode
+服务器启动后的访问地址：
+- **Web 界面**：http://localhost:9002
+- **HTTP API**：http://localhost:9002/v1
+- **WebSocket API**：ws://localhost:9003/v1/realtime
 
-```bash
-发言人 0: 是开始这个呃实时的一个转写。
-发言人 0: 对，
-发言人 0: 然后是转写的一个效果，
-发言人 0: 大概大概就是这个样子。
-发言人 0: 然后的话那个在这里边你也可以去给他那个加一个人。
-发言人 0: 比如说是嗯我随便给他取一个名字，
-发言人 1: 就是连云端的还是自己算的连云端的吧。
-发言人 0: 呃本地的本地的本地的对，
-发言人 0: 不用连看能调吧。
-发言人 2: 这个还有对呀，
-发言人 0: 然后这里边可以给他加格。
-```
+Web 界面提供三种识别方式：
+- **🌊 流式识别**：使用麦克风实时录音，通过 WebSocket 流式传输
+- **📂 文件流式识别**：选择本地音频文件，通过 WebSocket 以流式方式逐块发送
+- **📁 离线识别**：上传音频文件，通过 HTTP API 获取完整转写结果
 
-- srt mode
+## 架构
 
-```bash
-0 00:00:01,010 --> 00:00:04,865 发言人 0: 是开始这个呃实时的一个转写。 
-1 00:00:06,040 --> 00:00:06,280 发言人 0: 对， 
-2 00:00:06,640 --> 00:00:08,660 发言人 0: 然后是转写的一个效果， 
-3 00:00:08,680 --> 00:00:10,280 发言人 0: 大概大概就是这个样子。 
-4 00:00:10,280 --> 00:00:14,500 发言人 0: 然后的话那个在这里边你也可以去给他那个加一个人。 
-5 00:00:14,660 --> 00:00:19,665 发言人 0: 比如说是嗯我随便给他取一个名字， 
-6 00:00:20,440 --> 00:00:23,200 发言人 1: 就是连云端的还是自己算的连云端的吧。 
-7 00:00:23,240 --> 00:00:25,340 发言人 0: 呃本地的本地的本地的对， 
-8 00:00:25,340 --> 00:00:27,275 发言人 0: 不用连看能调吧。 
-9 00:00:29,120 --> 00:00:31,480 发言人 2: 这个还有对呀， 
-10 00:00:32,130 --> 00:00:33,885 发言人 0: 然后这里边可以给他加格。 
-```
+### 2-Pass ASR
 
----
+OddASR 采用 2-pass ASR 策略：
 
-## Repository Contents
+1. **流式识别**：使用流式 ASR 模型进行实时转录
+2. **离线优化**：使用离线 ASR 模型和标点模型进行最终优化
 
-### 1. Core Files
-- **`main_server.py`**: Implements the REST API server for ASR transcription.
-- **`main_local.py`**: A standalone Python implementation for local ASR transcription.
-- **`odd_asr_app.py`**: Main application file for running the REST API server.
-- **`odd_asr_config.py`**: Custom configurations for the project.
-- **`odd_asr_exception.py`**: Custom exception classes for the project.
-- **`odd_asr_result.py`**: Result classes for the project.
-- **`odd_asr.py`**: File ASR class for the project.
-- **`odd_asr_stream.py`**: Stream ASR class for the project.
-- **`odd_wss_server.py`**: Websocket server class for streaming ASR.
-- **`utils_speech.py`**: Utility functions used by the REST API which was origined from FunASR repo.
-- **`log.py`**: Logging configuration for the project.
-- **`router/asr_api.py`**: Defines the API endpoints for the REST API.
-- **`router/asr_front.py`**: Defines the front-end endpoints for the REST API.
+这种组合同时实现了低延迟和高准确率。
 
-### 2. Testing and Examples
-- **`testAPI.py`**: Example client script to test the file mode of ASR API.
-- **`testStreamAPI.py`**: Example client script to test the streaming mode of ASR API.
+### 支持的模型
 
-### 3. Audio Files
-- **`test_cn_male9s.wav`**: Example audio file for testing.
-- **`test_en_steve_jobs_10s.wav`**: Example audio file for testing.
-- **`test_cn_16k-16bits-mono.wav`**: Example audio file for streaming ASR testing.
+| 后端 | 流式识别 | 离线识别 | 标点 | 说话人识别 |
+|------|---------|---------|------|-----------|
+| Paraformer | paraformer-zh-streaming | paraformer-zh | ✓ | ✓ |
+| SenseVoice (sherpa-onnx) | sherpa-onnx (内置 VAD) | sherpa-onnx (内置 VAD) | 内置 | ✗ |
+| SenseVoice FunASR | iic/SenseVoiceSmall | iic/SenseVoiceSmall | 内置 | ✗ |
+| Moonshine | moonshine/base | moonshine/base | ✓ | ✗ |
+| Qwen3-ASR-0.6B | Qwen/Qwen3-ASR-0.6B | Qwen/Qwen3-ASR-0.6B | 内置 | ✓ |
+| Qwen3-ASR-1.7B | Qwen/Qwen3-ASR-1.7B | Qwen/Qwen3-ASR-1.7B | 内置 | ✓ |
 
-### 4. Deployment Files
 
-- **`Dockerfile`**: Dockerfile for building GPU-accelerated Docker images (NVIDIA GPU deployment).
-- **`Dockerfile_CPU`**: Dockerfile for building Docker images for simple CPU-based deployments.
+## API 使用方法
 
-### 5. Additional Files
-
-- **`requirements.txt`**: Python dependencies required for the project.
-
----
-
-## Features
-
-### 1. REST API for ASR
-
-- `main_server.py`Provides a REST API endpoint for audio file transcription.
-- Built using Flask.
-- Example usage: `python main_server.py`.
-
-### 2. Docker Support
-
-- Includes Dockerfiles for both GPU and CPU deployment.
-- Simplifies deployment on servers with or without GPU support.
-
-*BTW: I don't have a GPU to run test for GPU deployment, help wanted!*
-
----
-
-## Docker Deployment
-
-### 1. Install Docker
-
-```bash
-sudo apt-get update
-sudo apt-get install -y docker.io
-```
-
-Visit https://docs.oddmeta.net/#/engine-api/install_docker_on_ubuntu or https://docs.docker.com/engine/install/ubuntu/ for more details.
-
-### 2. CPU Deployment
-
-```bash
-docker build -t oddasr-cpu:v0.1.0 .
-docker run -d -p 12340:12340 -p 12341:12341 --name oddasr-cpu oddasr-cpu:v0.1.0
-```
-
-### 3. GPU Deployment
-
-```bash
-docker build -f Dockerfile_GPU -t oddasr-gpu:v0.1.0 .
-docker run -d -p 12340:12340 -p 12341:12341 --name oddasr-gpu oddasr-gpu:v0.1.0
-```
-
-### 4. About running oddasr container
-
-In the first run of oddasr container, it will download the model files from the internet, this would take quite sometime, from 10 minutes to more, depends on the bandwith of your internet.
-Even not for the first run, oddasr server still need a few minutes to startup, because we will load the model on startup to speed up the incoming ASR requests.
-
-You can use `docker logs -t oddasr` to check the download progress. If you find logs like below, it means oddasr has already download the model files, running and working.
+### Python 客户端
 
 ```
-2025-07-25T08:22:08.090277794Z 2025-07-25 08:22:08 INFO odd_asr_result.py:95 (1-124264901494464) - => Start ASR result dispatch Task Success 
-2025-07-25T08:22:08.093144025Z WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
-2025-07-25T08:22:08.093187031Z  * Running on all addresses (0.0.0.0)
-2025-07-25T08:22:08.093201526Z  * Running on http://127.0.0.1:12340
-2025-07-25T08:22:08.093213810Z  * Running on http://172.17.0.2:12340
-2025-07-25T08:22:08.093226351Z Press CTRL+C to quit
-2025-07-25T08:22:08.372302454Z 2025-07-25 08:22:08,371 - modelscope - INFO - Use user-specified model revision: v2.0.4
-2025-07-25T08:22:11.962184545Z 2025-07-25 08:22:11 DEBUG odd_asr_result.py:64 (1-124264901494464) - =============================================notifyTask: start=================================== 
+import openai
+
+client = openai.OpenAI(
+    base_url="http://localhost:9002/v1",
+    api_key="dummy"  # 兼容需要，实际无需填写
+)
+
+# 离线转录（通过 model 参数指定后端模型）
+with open("audio.wav", "rb") as audio_file:
+    transcript = client.audio.transcriptions.create(
+        model="oddasr2_paraformer-zh",  # 或 oddasr2_qwen3-asr-0.6b、oddasr2_sensevoice 等
+        file=audio_file,
+        response_format="text"  # text, srt, vtt, json, verbose_json, spk, diarized_json
+    )
+    print(transcript.text)
 ```
 
-### 5. Some docker commands for Docker newbies
-- run oddasr container: `docker run -d -p 12340:12345 -p 12341:12346 --name oddasr-cpu oddasr-cpu:v0.1.0`
-- list all running containers: `docker ps`
-- print container logs: `docker logs -t oddasr-cpu`
-- enter bash of your container: `docker exec -it oddasr-cpu bash`
-- stop oddasr container: `docker stop oddasr-cpu`
-- remove container: `docker rm oddasr-cpu`
-- list container images: `docker images`
-- remove image: `docker rmi IMAGE-ID`. `IMAGE-ID` is the image id, you can get it from `docker images`
+### cURL
 
----
+```
+curl -X POST http://localhost:9002/v1/audio/transcriptions \
+  -H "Content-Type: multipart/form-data" \
+  -F "file=@audio.wav" \
+  -F "model=oddasr2_paraformer-zh" \
+  -F "response_format=text"
+```
 
-## TODO
+> `model` 参数支持 `oddasr2_{model_type}` 格式（如 `oddasr2_qwen3-asr-0.6b`、`oddasr2_sensevoice-onnx`），优先于 `model_type` 参数。若 `model` 无法识别，则回退到 `model_type`。
 
-- [ ] Add more models and features.
-- [ ] Support realtime ASR.
-- [ ] Add more customized options.
-   - [ ] --output_format: txt表示纯文本, spk表示根据VAD分段后每个段落前面加发言人，srt表示在spk基础上为每个段落加一个段落在音频文件中的时间位置
-   - [ ] --hotword 热词文件，每行一个热词，格式(热词 权重)：阿里巴巴 20
-- [ ] Simple UI for oddasr to demostrate.
-- [ ] Support voiceprint recognition!!! [小落同学](https://x.oddmeta.net) really need this feature!!!
-- [ ] Other enhancements
-   - [ ] --thread_num 设置并发发送线程数，默认为1
-   - [ ] --audio_in 需要进行转写的音频文件，支持服务器本地/远程文件路径，文件列表wav.scp
-   - [ ] --ssl 设置是否开启ssl证书校验，默认1开启，设置为0关闭
-   - [ ] --use_itn 设置是否使用itn，默认1开启，设置为0关闭
+说话人分离（可指定说话人数量等参数，详见 [说话人分离配置](docs/oddasr-speaker-diarization-config.md)）：
 
----
+```
+curl -X POST http://localhost:9002/v1/audio/transcriptions \
+  -H "Content-Type: multipart/form-data" \
+  -F "file=@meeting.wav" \
+  -F "model_type=paraformer-zh" \
+  -F "response_format=diarized_json" \
+  -F "preset_spk_num=2"          # 可选：强制 2 个说话人
+  -F "max_num_spks=4"            # 可选：自动估计时的上限
+  -F "merge_thr=0.78"            # 可选：合并相似说话人的余弦阈值
+  -F "spk_mode=punc_segment"     # 可选：分离粒度
+```
 
-## Limitations
+### WebSocket 流式识别
 
-- ~~Only supports **non-realtime** ASR transcription.~~
-- Only supports **audio files** as input.
+```
+import asyncio
+import websockets
+import json
+import base64
 
----
+async def realtime_transcription():
+    # 通过 URL 的 model 参数指定后端模型（可选，不传则使用默认模型）
+    uri = "ws://localhost:9003/v1/realtime?model=oddasr2_qwen3-asr-0.6b"
+    
+    async with websockets.connect(uri) as websocket:
+        async for message in websocket:
+            data = json.loads(message)
+            
+            if data['type'] == 'conversation.item.input_audio_transcription.completed':
+                print(f"转录结果: {data['transcript']}")
+            elif data['type'] == 'response.audio_transcript.delta':
+                print(f"中间结果: {data['delta']}", end='\r')
+            elif data['type'] == 'error':
+                print(f"错误: {data['error']['message']}")
 
-## References
+asyncio.run(realtime_transcription())
+```
 
-- [FunASR](https://github.com/modelscope/FunASR): The ASR framework used in this project.
-- [Flask](https://github.com/pallets/flask): The web framework used for the REST API, which is based on Werkzeug and Jinja.
-- [funasr-python-api](https://github.com/open-yuhaoz/funasr-python-api): Python api written by funasr server post
+### 流式测试客户端
 
----
+项目内置了流式转写测试程序，支持命令行参数：
 
-## License
-This project is NOT licensed under any License.
-Copy free, without any string attached! Just happy coding!
+```
+# 基本用法
+python tests/test_api_streaming.py tests/test.wav
+
+# 指定 chunk 大小和服务器地址
+python tests/test_api_streaming.py tests/test.wav --chunk-ms 300 --host 192.168.1.10 --port 9003
+
+# 以最快速度发送（不模拟实时延迟）
+python tests/test_api_streaming.py tests/test.wav --no-simulate-realtime
+```
+
+功能特点：
+- 自动将音频重采样到 16kHz
+- 支持自定义 chunk 时长（默认 600ms）
+- 支持模拟实时发送或全速发送
+- 显示发送进度、partial 中间结果和 final 最终结果
+
+## 响应格式
+
+| 格式 | 说明 | 使用场景 |
+|------|------|----------|
+| text | 纯文本 | 简单转录 |
+| srt | SubRip 字幕 | 视频字幕 |
+| vtt | WebVTT 字幕 | 网页视频 |
+| json | 简单 JSON | 程序处理 |
+| verbose_json | 带时间戳的详细 JSON | 分析调试 |
+| spk | 说话人识别模型输出 | 说话人识别 |
+| diarized_json | 带说话人分离的详细 JSON | 说话人识别 |
+
+## 项目结构
+
+```
+oddasr/
+├── app.py                     # 主程序入口
+├── logic/                     # 业务逻辑
+│   ├── odd_asr_server.py           # WebSocket 服务器
+│   ├── odd_asr_stream_handler.py   # 流式处理器（OpenAI Realtime API 兼容）
+│   ├── odd_asr_instance_pool.py    # ASR 模型实例池管理
+│   └── odd_asr_global.py           # 全局状态
+├── models/                    # ASR 模型
+│   ├── base_asr.py                 # ASR 基类接口
+│   ├── paraformer_asr.py           # Paraformer 实现（含 Cython 加速）
+│   ├── moonshine_asr.py            # Moonshine 实现
+│   ├── sensevoice_onnx.py           # SenseVoice ONNX (sherpa-onnx) 实现
+│   ├── sensevoice_small.py        # SenseVoiceSmall 实现
+│   ├── qwen3_asr_06b.py            # Qwen3-ASR-0.6B 实现
+│   ├── qwen3_asr_17b.py            # Qwen3-ASR-1.7B 实现
+│   ├── realtime_asr.py             # Realtime ASR 控制器
+│   └── punctuation.py              # 标点模型
+├── router/                    # Flask 路由
+│   ├── api.py                      # REST API 路由
+│   └── front.py                    # 前端页面路由
+├── utils/                     # 工具函数
+│   ├── audio.py                    # 音频处理（含重采样）
+│   ├── vad.py                      # Silero VAD 语音活动检测
+│   ├── formatters.py               # 响应格式化（text/srt/vtt/json）
+│   ├── messages.py                 # WebSocket 消息格式（OpenAI 兼容）
+│   └── model_manager.py            # 模型下载管理
+├── templates/                 # Web 模板
+│   └── index.html                  # 网页 Demo（Tab 布局、企业蓝主题）
+├── static/                    # 静态文件
+├── tests/                     # 测试文件
+│   ├── test_api_offline.py         # 离线 API 集成测试
+│   ├── test_api_streaming.py       # 流式 WebSocket 测试客户端
+│   ├── test_vad.py                 # VAD 单元测试
+│   └── test_realtime_asr.py        # Realtime ASR 测试
+├── docs/                      # 文档
+├── models/oddasr_model/       # 本地 ONNX 模型（SenseVoice）
+├── config.json                # 用户自定义配置（可选）
+├── requirements.txt           # 依赖列表
+└── setup.py                   # 打包配置
+```
+
+## 开发
+
+### 运行测试
+
+```
+# 运行所有测试
+pytest tests/
+
+# 运行指定测试
+pytest tests/test_vad.py
+```
+
+### 代码结构
+
+代码遵循清晰的架构设计：
+
+- **logic/**：服务器和请求处理
+- **models/**：ASR 模型实现（Paraformer、Moonshine、SenseVoice-ONNX、SenseVoice、Qwen3-ASR-1.7B、Qwen3-ASR-0.6B）
+- **utils/**：音频处理、VAD、格式化工具
+
+## 配置
+
+服务使用内置 `DEFAULT_CONFIG` 启动，无需配置文件即可运行。如需自定义，在项目根目录创建 `config.json`，只需覆盖需要修改的项。
+
+### 配置示例
+
+```
+{
+  "active_model_index": 0,
+  "model_options": [
+    {
+      "model_type": "paraformer-zh",
+      "output_type": ["text", "srt", "vtt", "json", "verbose_json", "spk"],
+      "options": {
+        "streaming": {
+          "model": "paraformer-zh-streaming",
+          "device": "cpu",
+          "max_instance": 1
+        },
+        "offline": {
+          "model": "paraformer-zh",
+          "device": "cpu",
+          "max_instance": 1
+        },
+        "punc": {
+          "model": "iic/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727",
+          "revision": "v2.0.4"
+        },
+        "spk": {
+          "model": "iic/speech_campplus_sv_zh-cn_16k-common",
+          "enable": false,
+          "preset_spk_num": 0,
+          "max_num_spks": 15,
+          "merge_thr": 0.78,
+          "spk_mode": "punc_segment"
+        }
+      }
+    },
+    {
+      "model_type": "sensevoice-onnx",
+      "output_type": ["text"],
+      "options": {
+        "streaming": {
+          "model": "models/oddasr_model/model/model.int8.onnx",
+          "device": "cpu",
+          "max_instance": 1
+        },
+        "offline": {
+          "model": "models/oddasr_model/model/model.int8.onnx",
+          "device": "cpu",
+          "max_instance": 1
+        }
+      }
+    }
+  ],
+  "vad": {
+    "vad_use_model": true,
+    "vad_model_name": "silero-vad",
+    "vad_model_threshold": 0.5,
+    "vad_device": "cpu",
+    "vad_silence_duration": 1.0
+  },
+  "2pass": {
+    "max_audio_samples": 80000
+  }
+}
+```
+
+### 配置参数说明
+
+#### 模型配置
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `active_model_index` | 默认激活的模型选项索引 | 1 |
+| `model_options` | 可用模型配置列表 | 见 DEFAULT_CONFIG |
+| `model_options[].model_type` | ASR 后端类型标识 | paraformer-zh |
+| `model_options[].display_name` | 前端显示的模型名称 | 同 model_type |
+| `model_options[].output_type` | 该后端支持的响应格式 | `["text"]` |
+| `model_options[].options.streaming.model` | 流式识别模型名称 | paraformer-zh-streaming |
+| `model_options[].options.streaming.device` | 流式模型运行设备（`cpu`/`cuda`）| cpu |
+| `model_options[].options.offline.model` | 离线识别模型名称 | paraformer-zh |
+| `model_options[].options.offline.device` | 离线模型运行设备（`cpu`/`cuda`）| cpu |
+
+> **GPU 自动回退**：配置 `device=cuda` 时，服务启动会自动检查 `torch.cuda.is_available()`。若 CUDA 不可用（如驱动不兼容、PyTorch 版本不匹配），自动回退到 `cpu` 并输出 warning，确保服务仍能启动。
+| `model_options[].options.spk.enable` | 启用说话人识别（FunASR / Qwen3-ASR）| false |
+| `model_options[].options.spk.preset_spk_num` | 强制说话人数量，0=自动估计，>0=指定数量 | 0 |
+| `model_options[].options.spk.max_num_spks` | 自动估计时的说话人数量搜索上界 | 15 |
+| `model_options[].options.spk.merge_thr` | 合并相似说话人的余弦阈值 | 0.78 |
+| `model_options[].options.spk.spk_mode` | 说话人分离粒度：punc_segment/vad_segment/default | punc_segment |
+
+> 说话人分离参数的详细说明与使用示例见 [docs/oddasr-speaker-diarization-config.md](docs/oddasr-speaker-diarization-config.md)。
+
+#### VAD 配置
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `vad.vad_use_model` | 使用 Silero VAD 模型 | true |
+| `vad.vad_model_threshold` | 语音检测阈值 | 0.5 |
+| `vad.vad_silence_duration` | 触发结束说话的静音时长（秒）| 1.0 |
+| `vad.vad_speech_padding` | 语音前后填充时长（秒）| 0.3 |
+| `vad.vad_energy_threshold` | 能量模式阈值 | 0.01 |
+
+#### 2-Pass 配置
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `2pass.max_audio_samples` | 最大音频采样数（约 5s@16kHz）| 80000 |
+
+#### 服务器配置
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `server.max_connections` | 最大 WebSocket 连接数 | 50 |
+| `server.ping_interval` | WebSocket ping 间隔（秒）| 30 |
+| `server.ping_timeout` | WebSocket ping 超时（秒）| 300 |
+
+
+## 许可证
+
+MIT 许可证 - 详见 LICENSE 文件
+
+## 技术支持
+
+- GitHub：https://github.com/oddmeta/oddasr
+- 文档：https://oddmeta.net/docs/oddasr
+- 问题反馈：https://github.com/oddmeta/oddasr/issues
+
+## 致谢
+
+- [FunASR](https://github.com/modelscope/FunASR) - 优秀的 ASR 模型
+- [Moonshine](https://github.com/usefulsensors/moonshine) - 快速流式 ASR
+- [SenseVoice](https://github.com/k2-fsa/sherpa-onnx/tree/main/sensevoice) - ONNX优化SenseVoice模型
+- [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR) - 通义千问语音识别模型
+- [Silero VAD](https://github.com/snakers4/silero-vad) - 语音活动检测
+- OpenAI API 设计: https://developers.openai.com/api/docs/guides/speech-to-text
